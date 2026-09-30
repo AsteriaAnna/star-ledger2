@@ -156,3 +156,30 @@ test('WeChat received transfer explicitly deposited into wallet resolves the mis
  const h=['交易时间','交易类型','交易对方','商品','收/支','金额(元)','支付方式','当前状态','交易单号'];
  const ds=parseRows([h,['2026-09-20 12:00:00','转账','朋友','转账','收入','10','/','已存入零钱','received']]);const s=setup(ds),d=s.state.imports![0];assert.equal(d.kind,'TRANSFER_IN');assert.ok(d.account);assert.equal(d.issue,'');assert.equal(s.get('accounts',d.account)!.fields.name,'微信零钱');assert.equal(d.channel,'/');
 });
+
+test('deleted source re-import revives the original in place with the new recognition',async()=>{
+ const {correctionSnapshot}=await import('../packages/accounting/business.ts');
+ const s=new MemoryStore(fresh()),service=svc(s);
+ service.execute({kind:'CREATE_ACCOUNT',id:'a',name:'卡',accountType:'ASSET',openingBalance:10000,openingBalanceAt:'2026-09-01T00:00:00Z'});
+ const d=parse([row()])[0];
+ service.execute({kind:'PURCHASE',id:'p',name:d.name,amount:4450,payer:'a',categoryId:'餐饮',occurredAt:'2026-09-20T04:00:00Z',source:source(d)});
+ service.execute({kind:'DELETE_TRANSACTION',transactionId:'p',deletedAt:'2026-09-21T00:00:00Z'});
+ assert.ok(s.get('transactions','p')!.fields.deleted_at);
+ const d2=parse([row('农业银行储蓄卡(2372)','order1','午餐','餐饮美食','支出','50.00','交易成功','2026-09-20 12:00:00')])[0];
+ const reviewed=reviewDraft(d2,s.entities,[]);
+ assert.equal(reviewed.transactionId,'p'); // 命中已删除的同一来源
+ assert.equal(reviewed.workflow,'review'); // 可入账，而非 linked 死胡同
+ assert.match(reviewed.reviveHint||'',/回收站/); // 非阻断复活提示
+ // 复刻 commitImport 的两阶段：先复活，再以本次识别覆盖
+ new AccountingService(s,s.state.device).execute([{action:'RESOLVE_CONFLICT',entity:{type:'transactions',id:'p',fields:{deleted_at:null}}}]);
+ const replacement={kind:'PURCHASE' as const,id:'p',name:String(s.get('transactions','p')!.fields.display_name),amount:5000,payer:'a',categoryId:'交通',occurredAt:'2026-09-20T04:00:00Z'};
+ service.execute({kind:'CORRECT_IMPORTED_EVENT' as const,transactionId:'p',replacement,expectedSnapshot:correctionSnapshot(s.entities,'p'),sourceId:'revive',correctedAt:'2026-09-30T00:00:00Z'});
+ const t=s.get('transactions','p')!;
+ assert.equal(t.fields.deleted_at,null); // 已复活
+ assert.equal(t.fields.display_amount,5000); // 金额覆盖为新识别
+ assert.equal(s.get('consumption_effects','p:effect')!.fields.category_id,'交通'); // 新识别分类
+ assert.equal(s.entities.filter(e=>e.type==='transactions'&&e.id==='p').length,1); // 不新增交易
+ assert.equal(snapshot(s).conflicts.length,0); // 无 CREATE_ID_COLLISION / 生命周期冲突
+ assert.equal(consumptionInPeriod(snapshot(s),...period),5000);
+ assert.equal(accountBalance(snapshot(s),'a','2026-09-30T00:00:00Z').balance,5000);
+});

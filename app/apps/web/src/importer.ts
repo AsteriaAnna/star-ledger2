@@ -3,7 +3,7 @@ import {needsSplit} from './channels.ts';
 import {sourceCategory} from './categories.ts';
 export {money} from './normalize.ts';
 export type Draft={key:string;platform:string;name:string;amount:string;date:string;kind:string;status:string;channel:string;account:string;to:string;category:string;original:string;note:string;raw:string;issue:string;selected:boolean;sourceType:'EXCEL'|'SCREENSHOT';order:string;sponsor:boolean;consumption:string;
- originalMode?:string;refundHint?:string;sourceCategory?:string;profile?:string;batch?:string;itemId?:string;identity?:string;sourceClass?:string;originalOrder?:string;precision?:string;blockers?:string[];confirmed?:string[];accountMode?:string;toMode?:string;accountHint?:string;toHint?:string;workflow?:string;transactionId?:string;fee?:string;parserVersion?:number;};
+ originalMode?:string;refundHint?:string;reviveHint?:string;sourceCategory?:string;profile?:string;batch?:string;itemId?:string;identity?:string;sourceClass?:string;originalOrder?:string;precision?:string;blockers?:string[];confirmed?:string[];accountMode?:string;toMode?:string;accountHint?:string;toHint?:string;workflow?:string;transactionId?:string;fee?:string;parserVersion?:number;};
 export function csv(text:string):string[][]{const rows:string[][]=[];let row:string[]=[],v='',quoted=false;for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quoted&&text[i+1]==='"'){v+='"';i++;}else quoted=!quoted;}else if(c===','&&!quoted){row.push(v);v='';}else if((c==='\n'||c==='\r')&&!quoted){if(c==='\r'&&text[i+1]==='\n')i++;row.push(v);if(row.some(x=>x.trim()))rows.push(row);row=[];v='';}else v+=c;}row.push(v);if(row.some(x=>x.trim()))rows.push(row);return rows;}
 const clean=(v:any)=>v instanceof Date?v.toISOString().slice(0,19):String(v??'').replace(/^\uFEFF/,'').trim();
 const norm=(s:string)=>s.replace(/[\s（()）]/g,'');
@@ -13,7 +13,7 @@ export function parseRows(rows:any[][],config:{originalMode?:string;refundHint?:
  const headers=rows[index].map(v=>norm(clean(v)));const intro=rows.slice(0,index).flat().map(clean).join(' ');
  const platform=config.platform||(/微信/.test(intro)||headers.includes('交易单号')?'微信':/支付宝/.test(intro)||headers.includes('交易订单号')?'支付宝':'未知模板');
  const cell=(row:any[],...keys:string[])=>{for(const k of keys){const n=headers.indexOf(norm(config.columns?.[k]||k));if(n>=0)return clean(row[n]);}return '';};
- const batch=config.batch||hash(rows),profile=config.profile||'本人';const out:Draft[]=[];
+ const batch=config.batch||hash(rows),profile=config.profile||'本人';const out:Draft[]=[];const seen=new Map<string,number>();
  for(const [rowIndex,row]of rows.slice(index+1).entries()){
   const dt=cell(row,'交易时间','付款时间','交易创建时间');if(!dt||/合计|总计|说明/.test(dt))continue;
   const rawAmount=cell(row,'金额元','金额','交易金额元','交易金额');if(!rawAmount)continue;
@@ -43,9 +43,11 @@ export function parseRows(rows:any[][],config:{originalMode?:string;refundHint?:
    if(platform==='微信'&&type==='零钱提现'){const feeText=cell(row,'备注').match(/服务费[¥￥]\s*(\d+(?:\.\d{1,2})?)/)?.[1];if(feeText!==undefined){fee=feeText;const principal=money(rawAmount)-Math.round(Number(fee)*100);if(principal<=0)throw Error('INVALID_FEE');amount=(principal/100).toFixed(2);}else blockers.push('TRANSFER');}
   }catch{blockers.push('AMOUNT');}
   if(platform==='未知模板')blockers.push('TEMPLATE');
-  // Refunds without their own identifier are weak identities scoped to file+row, never collapsed by original order.
+  // 无单号来源：用内容指纹 + 出现序数稳定识别，跨文件改动不再漂移（替代 batch+row）；有单号仍用稳定单号。
   const sourceClass=refundEvent?'refund':'payment';const eventId=refundEvent?(refundId||order):order;
-  const identity=hash(eventId?{v:2,platform,profile,sourceClass,eventId}:{v:2,platform,profile,batch,row:rowIndex});
+  let identity:string;
+  if(eventId)identity=hash({v:2,platform,profile,sourceClass,eventId});
+  else{const contentKey=hash({v:3,platform,profile,at:date.utc,amount,type,counterparty:cell(row,'交易对方','对方名称')});const occurrence=seen.get(contentKey)||0;seen.set(contentKey,occurrence+1);identity=hash({v:3,contentKey,occurrence});}
   const d:Draft={key:identity,identity,itemId:hash({batch,profile,platform,row:rowIndex}),batch,profile,sourceClass,originalOrder,platform,name,amount,date:date.wall,precision:date.precision,kind,status,channel,account:'',to:'',category:sourceCategory(platform,cell(row,'交易分类'),name,product),sourceCategory:cell(row,'交易分类'),original:'',note:useful(cell(row,'备注'))||product,raw,issue:'',selected:false,sourceType:'EXCEL',order:refundId||order,sponsor,consumption:'0',fee,blockers,confirmed:[],workflow:status==='FAILED'?'noeffect':'review',parserVersion:3};
   d.issue=issues(d).join('；');d.selected=status==='SUCCESS'&&!d.issue;out.push(d);
  }

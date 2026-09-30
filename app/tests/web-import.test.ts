@@ -9,3 +9,12 @@ test('official rows preserve refunds, sponsors, pending status and internal tran
 test('CSV handles BOM, quoted commas and embedded newlines',()=>{const rows=csv('\uFEFF交易时间,金额(元),交易对方\r\n2026-09-20 12:00:00,44.00,"商户,\n分店"');assert.equal(rows[1][2],'商户,\n分店');});
 test('money is integer cents and invalid amounts fail',()=>{assert.equal(money('￥1,234.50'),123450);assert.throws(()=>money('1.005'));assert.throws(()=>money('-44'));});
 test('screenshot parser does not substitute current date when recognition misses it',()=>{const d=parseScreenshot('微信支付\n收款方 测试商户\n￥44.00\n支付成功','hash');assert.equal(d.amount,'44.00');assert.equal(d.date,'');assert.equal(d.selected,false);});
+test('无单号来源用内容指纹稳定识别，跨文件不漂移',()=>{
+ const noOrder=(amount='44.50',date='2026-09-20 12:00:00')=>[date,'餐饮美食','商户','午餐','支出',amount,'余额','交易成功',''];
+ const single=parseRows([headers,noOrder()])[0];
+ const changedFile=parseRows([headers,noOrder(),['2026-09-20 13:00:00','餐饮美食','商户','晚餐','支出','66.00','余额','交易成功','']])[0];
+ assert.equal(single.identity,changedFile.identity); // 文件内容变了，身份仍稳定
+ const twin=parseRows([headers,noOrder(),noOrder()])[1];
+ assert.notEqual(single.identity,twin.identity); // 同文件完全相同的第二笔用出现序数区分
+ assert.notEqual(single.identity,parseRows([headers,noOrder('66.00')])[0].identity); // 金额不同即不同交易
+});

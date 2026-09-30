@@ -54,7 +54,16 @@ export function reviewDraft(d:Draft,entities:Entity[],conflicts:Conflict[],refun
  for(const r of ['account','to'] as const){const result=resolveAccount(d,ac,rules,conflicts,r);if(['conflict','invalid'].includes(result.state))d.blockers=[...new Set([...(d.blockers||[]),r==='account'?'ACCOUNT':'TO'])];else d.blockers=(d.blockers||[]).filter(b=>b!==(r==='account'?'ACCOUNT':'TO'));const hint=result.reason+(result.candidates.length?'：'+result.candidates.map(id=>ac.find(a=>a.id===id)?.fields.name||id).join(' / '):'');if(r==='account')d.accountHint=hint;else d.toHint=hint;if(d[r+'Mode' as 'accountMode'|'toMode']!=='manual'){d[r]=result.id;if(r==='account')d.accountMode=result.id?'alias':'';else d.toMode=result.id?'alias':'';}}
  if(ruleValue(entities,'ignore-'+(d.identity||d.key))?.ignored){if(d.workflow!=='ignored')d.selected=false;d.workflow='ignored';}
  const existing=existingSource(d,entities);
- if(existing.length){d.transactionId=existing[0].id;d.workflow=d.workflow==='committed'?'committed':'linked';d.selected=false;d.issue=existing.length>1?'同一来源对应多笔旧交易，请核验':identicalInterpretation(d,existing[0],entities)?(existing[0].fields.deleted_at?'原交易在回收站，不重复导入':'来源已存在，不重复入账'):'已有来源的状态/类型/金额/时间不同，请核验；不会新增交易';return d;}
+ if(existing.length){
+  d.transactionId=existing[0].id;
+  if(existing[0].fields.deleted_at){
+   // 删除态来源不阻断：重导入账时复活原交易并以本次识别覆盖（非阻断提示，继续走下方正常核验）。
+   d.reviveHint='原记录在回收站，入账将恢复并以本次识别为准';
+   if(['committed','linked'].includes(d.workflow||''))d.workflow='review';
+  }else{
+   d.workflow=d.workflow==='committed'?'committed':'linked';d.selected=false;d.issue=existing.length>1?'同一来源对应多笔旧交易，请核验':identicalInterpretation(d,existing[0],entities)?'来源已存在，不重复入账':'已有来源的状态/类型/金额/时间不同，请核验；不会新增交易';return d;
+  }
+ }
  if(d.status==='FAILED'){d.workflow='noeffect';d.selected=false;d.issue='失败记录已保留，无账务影响';return d;}
  const problems=issues(d);try{money(d.amount);}catch{problems.push('核对有效金额');}try{sourceUTC(d.date);}catch{problems.push('补充完整时间');}
  if(!d.name.trim())problems.push('补充交易名称');if(d.status==='UNKNOWN')problems.push('确认状态');if(d.kind==='UNKNOWN')problems.push('确认交易性质');
