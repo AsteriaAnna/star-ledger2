@@ -2,16 +2,23 @@ import type {MemoryStore} from './store.ts';
 import type {Draft} from './importer.ts';
 import {BusinessAccountingService} from '../../../packages/accounting/business.ts';
 import {AccountingService} from '../../../packages/accounting/index.ts';
+import type {Command} from '../../../packages/accounting/index.ts';
+import type {Entity} from '../../../packages/domain/index.ts';
 import {project} from '../../../packages/sync/projection.ts';
 import {accountSetupGroups,allowedAccount,aliasId,aliasScope,canRemember,instrumentId,type Role} from './account-matcher.ts';
 import {reviewDraft,ruleCommand,ruleValue} from './import-workflow.ts';
 import {refundContext} from './refund-matcher.ts';
-export function rememberAccount(store:MemoryStore,d:Draft,role:Role,id:string){
- if(!canRemember(d,role))return;
- const core=new AccountingService(store,store.state.device);
- if(ruleValue(store.entities,aliasId(d,role))?.accountId!==id)core.execute([ruleCommand(store.entities,aliasId(d,role),{...aliasScope(d,role),accountId:id})]);
+export function rememberAccountCommands(entities:Entity[],d:Draft,role:Role,id:string):Command[]{
+ if(!canRemember(d,role))return [];
+ const out:Command[]=[];
+ if(ruleValue(entities,aliasId(d,role))?.accountId!==id)out.push(ruleCommand(entities,aliasId(d,role),{...aliasScope(d,role),accountId:id}));
  const key=instrumentId(d,role);
- if(key&&!store.entities.some(e=>e.type==='import_rules'&&e.id===key&&e.fields.value!==null))core.execute([ruleCommand(store.entities,key,{accountId:id})]);
+ if(key&&!entities.some(e=>e.type==='import_rules'&&e.id===key&&e.fields.value!==null))out.push(ruleCommand(entities,key,{accountId:id}));
+ return out;
+}
+export function rememberAccount(store:MemoryStore,d:Draft,role:Role,id:string){
+ const cmds=rememberAccountCommands(store.entities,d,role,id);
+ if(cmds.length)new AccountingService(store,store.state.device).execute(cmds);
 }
 export type AccountChoice={key:string;accountId:string;name:string;type:'ASSET'|'LIABILITY'};
 export function configureImportAccounts(store:MemoryStore,choices:AccountChoice[],expected:number){
