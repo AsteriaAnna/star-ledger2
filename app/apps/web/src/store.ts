@@ -13,12 +13,12 @@ import {webSessionCrypto} from '../../../packages/platform/web-crypto.ts';
 export type State={version:2;imports?:Draft[];importRevision?:number;revision:number;device:string;ops:Operation[];pending:string[];batches:{device:string;seq:number;checksum:string}[];envelopes:Record<string,string>;settings:Record<string,any>};
 export const fresh=():State=>({version:2,imports:[],importRevision:0,revision:0,device:crypto.randomUUID(),ops:[],pending:[],batches:[],envelopes:{},settings:{budget:300000,categories:['餐饮','购物','交通','生活','娱乐','学习','医疗','其他'],mode:'auto'}});
 export class MemoryStore implements SyncStore {
- state:State;entities:Entity[];
- constructor(state:State){this.state=structuredClone(state);this.entities=project(state.ops).entities;}
- atomic<T>(fn:()=>T):T{const s=structuredClone(this.state),e=this.entities;try{return fn();}catch(err){this.state=s;this.entities=e;throw err;}}
+ state:State;entities:Entity[];conflicts:Conflict[];
+ constructor(state:State){this.state=structuredClone(state);const p=project(state.ops);this.entities=p.entities;this.conflicts=p.conflicts;}
+ atomic<T>(fn:()=>T):T{const s=structuredClone(this.state),e=this.entities,c=this.conflicts;try{return fn();}catch(err){this.state=s;this.entities=e;this.conflicts=c;throw err;}}
  allOperations(){return structuredClone(this.state.ops);}
  append(op:Operation,local:boolean){this.state.ops.push(structuredClone(op));if(local)this.state.pending.push(op.id);}
- project(entities:Entity[],_c:Conflict[],_v:FieldVersion[]){this.entities=entities;}
+ project(entities:Entity[],conflicts:Conflict[],_v:FieldVersion[]){this.entities=entities;this.conflicts=conflicts;}
  get(type:EntityType,id:string){return this.entities.find(e=>e.type===type&&e.id===id);}
  pendingOperations(){const ids=new Set(this.state.pending);return this.state.ops.filter(o=>ids.has(o.id));}
  acknowledgeOperations(ids:string[]){const set=new Set(ids);this.state.pending=this.state.pending.filter(id=>!set.has(id));}

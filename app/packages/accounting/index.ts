@@ -9,14 +9,16 @@ export class AccountingService {
  execute(input:Command[]|((snapshot:LedgerSnapshot)=>Command[]),fault?:()=>void):Operation[] {
   return this.store.atomic(()=>{
    const ops=this.store.allOperations();const result:Operation[]=[];
-   const commands=typeof input==='function'?input(project(ops)):input;
+   const base=typeof input==='function'?project(ops):null;
+   const commands=typeof input==='function'?input(base!):input;
    if(!commands.length){if(typeof input==='function')return [];throw Error('EMPTY_COMMAND');}
+   const conflicts=(base??project(ops)).conflicts;
    let seq=Math.max(0,...ops.filter(o=>o.device===this.device).map(o=>o.seq));
    const commandId=`${this.device}:${seq+1}`;
    for(const c of commands) {
     const existing=this.store.get(c.entity.type,c.entity.id);
     if(c.action==='PATCH_FIELD') {
-     const blocked=project(ops).conflicts.some(x=>(x.entity_type===c.entity.type&&x.entity_id===c.entity.id&&(x.field==='$lifecycle'||Object.hasOwn(c.entity.fields,x.field))) || (x.field==='$lifecycle'&&x.entity_type==='transactions'&&existing?.fields.transaction_id===x.entity_id));
+     const blocked=conflicts.some(x=>(x.entity_type===c.entity.type&&x.entity_id===c.entity.id&&(x.field==='$lifecycle'||Object.hasOwn(c.entity.fields,x.field))) || (x.field==='$lifecycle'&&x.entity_type==='transactions'&&existing?.fields.transaction_id===x.entity_id));
      if(blocked)throw Error('EXPLICIT_RESOLUTION_REQUIRED');
      if(Object.hasOwn(c.entity.fields,'account_id')&&!(c.entity.type==='balance_movements'&&existing?.fields.account_id===null&&commands.some(other=>other.entity.type===c.entity.type&&other.entity.id===c.entity.id&&Object.hasOwn(other.entity.fields,'amount'))))throw Error('STRUCTURAL_EDIT_NOT_SUPPORTED');
      if(Object.keys(c.entity.fields).some(k=>['transaction_id','from_transaction_id','to_transaction_id','created_at'].includes(k)))throw Error('STRUCTURAL_EDIT_NOT_SUPPORTED');
@@ -26,7 +28,7 @@ export class AccountingService {
      if(parent?.fields.deleted_at)throw Error('PARENT_DELETED');
     }
     if(c.action!=='CREATE_ENTITY'&&!existing&&!result.some(o=>o.entity.id===c.entity.id&&o.entity.type===c.entity.type))throw Error('MISSING_ENTITY');
-    if(c.action==='PATCH_FIELD'&&existing?.fields.deleted_at)throw Error('ENTITY_DELETED');
+    if(c.action==='PATCH_FIELD'&&existing?.fields.deleted_at&&!Object.hasOwn(c.entity.fields,'purged_at'))throw Error('ENTITY_DELETED');
     if(c.action==='RESOLVE_CONFLICT'&&Object.hasOwn(c.entity.fields,'deleted_at')&&c.entity.fields.deleted_at!==null&&typeof c.entity.fields.deleted_at!=='string')throw Error('INVALID_RESOLUTION');
     seq++;
     // Observed causal frontier; clocks and timestamps never select a winning edit.

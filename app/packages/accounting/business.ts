@@ -25,6 +25,13 @@ export class BusinessAccountingService {
  private core:AccountingService;
  constructor(store:Store,device:string){this.core=new AccountingService(store,device);}
  execute(command:BusinessCommand):Operation[] {return this.core.execute(snapshot=>interpret(command,snapshot));}
+ executeBatch(commands:BusinessCommand[]):Operation[] {
+  return this.core.execute(snapshot=>{
+   let snap=snapshot;const out:Command[]=[];
+   for(const c of commands){const cmds=interpret(c,snap);out.push(...cmds);if(cmds.length)snap=applyCommands(snap,cmds);}
+   return out;
+  });
+ }
 }
 
 /** Pure interpretation. The caller runs it inside the same SQLite transaction as commit. */
@@ -291,4 +298,19 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
   default:throw Error('UNSUPPORTED_BUSINESS_COMMAND');
  }
  return commands;
+}
+
+// Advance an in-memory snapshot by the low-level commands of one business command,
+// so the next `interpret` in a batch sees prior effects (e.g. the alias rule just created).
+export function applyCommands(snap:LedgerSnapshot,cmds:Command[]):LedgerSnapshot {
+ const entities=[...snap.entities];
+ for(const c of cmds){
+  const i=entities.findIndex(e=>e.type===c.entity.type&&e.id===c.entity.id);
+  if(c.action==='CREATE_ENTITY')entities.push(structuredClone(c.entity));
+  else if(i>=0){
+   if(c.action==='DELETE_ENTITY')entities[i]={...entities[i],fields:{...entities[i].fields,deleted_at:c.entity.fields.deleted_at}};
+   else entities[i]={...entities[i],fields:{...entities[i].fields,...c.entity.fields}};
+  }
+ }
+ return {entities,conflicts:snap.conflicts};
 }

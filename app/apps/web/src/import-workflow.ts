@@ -20,7 +20,7 @@ export function existingSource(d:Draft,entities:Entity[]){
   // Legacy records lack profile and stable event identity: block unsafe re-import, do not rewrite.
   if(p.identity===(d.identity||d.key)||s.id==='source-'+d.key||d.order&&p.order===d.order&&s.fields.platform===d.platform&&(!p.profile||p.profile===d.profile))ids.add(String(s.fields.transaction_id));
  }
- return entities.filter(e=>e.type==='transactions'&&ids.has(e.id));
+ return entities.filter(e=>e.type==='transactions'&&ids.has(e.id)&&!e.fields.purged_at);
 }
 export function identicalInterpretation(d:Draft,t:Entity,entities:Entity[]=[]){try{
  if(t.fields.event_type!==d.kind||t.fields.status!==d.status||t.fields.display_amount!==money(d.amount)||t.fields.occurred_at!==sourceUTC(d.date))return false;
@@ -80,7 +80,7 @@ export function reviewDraft(d:Draft,entities:Entity[],conflicts:Conflict[],refun
 export function groupKey(d:Draft){return JSON.stringify([d.platform,d.profile||'本人',d.kind,d.status,d.channel,d.workflow==='deferred'?'deferred':'active']);}
 export function safeCandidates(d:Draft,entities:Entity[]){
  let amount:number,at:number;try{amount=money(d.amount);at=Date.parse(sourceUTC(d.date));}catch{return [];}
- return entities.filter(e=>e.type==='transactions'&&!e.fields.deleted_at&&e.fields.display_amount===amount&&e.fields.event_type===d.kind&&Math.abs(Date.parse(String(e.fields.occurred_at))-at)<86400000).filter(t=>{
+ return entities.filter(e=>e.type==='transactions'&&!e.fields.deleted_at&&!e.fields.purged_at&&e.fields.display_amount===amount&&e.fields.event_type===d.kind&&Math.abs(Date.parse(String(e.fields.occurred_at))-at)<86400000).filter(t=>{
   const sources=entities.filter(e=>e.type==='source_records'&&e.fields.transaction_id===t.id&&e.fields.platform===d.platform);
   return !d.order||!sources.some(s=>{try{const p=JSON.parse(String(s.fields.raw_payload));return p.order&&p.order!==d.order;}catch{return false;}});
  });
