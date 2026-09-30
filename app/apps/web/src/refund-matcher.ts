@@ -10,6 +10,22 @@ export function originalOrderCandidates(d:Draft){
 }
 function rawFields(d:Draft):Record<string,string>{try{return JSON.parse(d.raw);}catch{return {};}}
 function merchant(value:string){return value.replace(/[-－—]退款$|^退款[-－—]?|\s/g,'');}
+// 微信退款在「当前状态」里自带的退款标注：`已全额退款`，或 `已退款(¥X)` / `已退款¥X` 的退款总额（分）。
+function refundAnnotation(statusText:string):{kind:'full'}|{kind:'partial';amount:number}|null{
+ if(!statusText)return null;
+ if(/已全额退款/.test(statusText))return {kind:'full'};
+ const m=statusText.match(/已退款[（(]?[¥￥]\s*(\d+(?:\.\d{1,2})?)/);
+ return m?{kind:'partial',amount:Math.round(Number(m[1])*100)}:null;
+}
+// 平台标注是权威键：退款行与某笔原消费的状态标注能对上（同为「已全额退款」且金额相等，或退款总额相同），即视为同一笔。
+function annotationMatches(refundAnn:NonNullable<ReturnType<typeof refundAnnotation>>,sources:any[],displayAmount:number,amount:number){
+ return sources.some(p=>{let original:any;try{original=JSON.parse(p.original||'{}');}catch{original={};}
+  const a=refundAnnotation(original['当前状态']||'');
+  if(!a)return false;
+  if(refundAnn.kind==='full')return a.kind==='full'&&displayAmount===amount;
+  return a.kind==='partial'&&a.amount===refundAnn.amount;
+ });
+}
 export function refundContext(entities:Entity[],drafts:Draft[]){
  const result=[...entities];
  for(const d of drafts){
@@ -28,6 +44,7 @@ export function resolveRefund(d:Draft,entities:Entity[]){
  let amount:number,at:number;try{amount=money(d.amount);at=Date.parse(sourceUTC(d.date));}catch{return none;}
  if(d.originalMode==='manual'&&!d.original)return none;
  const orderKeys=originalOrderCandidates(d),raw=rawFields(d);
+ const refundAnn=d.kind==='REFUND'&&d.platform==='微信'?refundAnnotation(raw['当前状态']||''):null;
  const sourceById=new Map<string,any[]>();
  for(const s of entities.filter(e=>e.type==='source_records'&&e.fields.platform===d.platform)){try{const p=JSON.parse(String(s.fields.raw_payload));if(p.profile&&p.profile!==(d.profile||'本人'))continue;const id=String(s.fields.transaction_id);sourceById.set(id,[...(sourceById.get(id)||[]),p]);}catch{}}
  const candidates=entities.filter(t=>{
@@ -40,14 +57,18 @@ export function resolveRefund(d:Draft,entities:Entity[]){
   if(d.kind==='RETURN'&&consumption>0&&consumption!==Number(t.fields.display_amount)&&amount!==Number(t.fields.display_amount))return false;
   const sources=sourceById.get(t.id)||[];
   if(orderKeys.length)return sources.some(p=>orderKeys.includes(p.order));
-  if(d.platform!=='微信'||delta>90*86400000||Number(t.fields.display_amount)!==amount||!sources.length)return false;
+  if(d.platform!=='微信')return false;
+  // 平台退款标注优先于商户名+全额金额的猜测，覆盖部分退款与商户名差异。
+  if(refundAnn)return annotationMatches(refundAnn,sources,Number(t.fields.display_amount),amount);
+  if(delta>90*86400000||Number(t.fields.display_amount)!==amount||!sources.length)return false;
   const name=merchant(d.name),type=merchant(raw['交易类型']||'');
   if(d.kind==='RETURN'&&(!raw['交易对方']||raw['交易对方']==='/')){const remark=raw['商品']||'';return !!remark&&remark!=='/'&&sources.some(p=>{try{const original=JSON.parse(p.original||'{}');return original['商品']===remark;}catch{return false;}});}
   return !!name&&(merchant(String(t.fields.display_name))===name||!!type&&merchant(String(t.fields.display_name))===type);
  });
  if(candidates.length!==1)return {...none,candidates:candidates.map(t=>t.id),reason:candidates.length?'有多个原交易候选，可入账后关联':none.reason};
  const t=candidates[0],ms=entities.filter(e=>e.type==='balance_movements'&&e.fields.transaction_id===t.id&&e.fields.amount!==0);
- return {id:t.id,account:String(ms[0]?.fields.account_id||''),sponsor:ms.length===0,reason:orderKeys.length?'已按原订单号关联':'已按唯一商户/对方、全额金额与时间关联',candidates:[t.id]};
+ const byAnnotation=!!refundAnn&&annotationMatches(refundAnn,sourceById.get(t.id)||[],Number(t.fields.display_amount),amount);
+ return {id:t.id,account:String(ms[0]?.fields.account_id||''),sponsor:ms.length===0,reason:orderKeys.length?'已按原订单号关联':byAnnotation?'已按退款状态标注金额关联':'已按唯一商户/对方、全额金额与时间关联',candidates:[t.id]};
 }
 export function storedRefundDraft(t:Entity,entities:Entity[]):Draft|undefined{
  const s=entities.find(e=>e.type==='source_records'&&e.fields.transaction_id===t.id);if(!s)return;
