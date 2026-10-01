@@ -20,7 +20,10 @@ export type Refund = EventBase & {kind:'REFUND'|'RETURN';amount:number;originalI
  funding?:'OWN'|'EXTERNAL_SPONSOR';categoryId?:string;consumptionReduction?:number};
 export type Meaning = {kind:'SET_CONSUMPTION';transactionId:string;amount:number;categoryId:string|null};
 export type DeleteTransaction = {kind:'DELETE_TRANSACTION';transactionId:string;deletedAt:string};
-export type FinancialEvent = Purchase|Income|InternalTransfer|Withdrawal|ExternalPayment|Repayment|Refund;
+/** A fully resolved accounting intent ready for domain validation and posting. */
+export type LedgerIntent = Purchase|Income|InternalTransfer|Withdrawal|ExternalPayment|Repayment|Refund;
+/** @deprecated Use LedgerIntent. Kept during the M4 parallel migration. */
+export type FinancialEvent = LedgerIntent;
 export type SetStatus = {kind:'SET_STATUS';transactionId:string;status:'SUCCESS'|'FAILED';settlement?:FinancialEvent};
 export type BindAccount = ({kind:'BIND_ACCOUNT'}|{kind:'RESOLVE_ACCOUNT_BINDING'}) & {movementId:string;accountId:string};
 export type ResolveSettlement = {kind:'RESOLVE_SETTLEMENT';transactionId:string;status:'SUCCESS'|'FAILED';settlement?:FinancialEvent;expectedOperationIds:string[]};
