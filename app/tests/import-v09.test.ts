@@ -78,6 +78,27 @@ test('WeChat unique full refund matches; partial and multiple equal purchases st
  assert.equal(resolveRefund(refund,refundContext([], [original,{...original,key:'another',identity:'another'}])).id,'');
  const unbound=reviewDraft({...refund,channel:'/',amount:'0.44'},[],[]);assert.equal(unbound.issue,'');
 });
+test('WeChat refund status annotation links partial and full refunds despite merchant-name mismatch',()=>{
+ const wh=['交易时间','交易类型','交易对方','商品','收/支','金额(元)','支付方式','当前状态','交易单号'];
+ // 部分退款：退款行与订单的「已退款¥0.70」总额相同，即使商户名不同也能对上。
+ const partial=parseRows([wh,
+  ['2026-09-20 12:00:00','商户消费','盒马','订单','支出','10.00','零钱','已退款(¥0.70)','paid1'],
+  ['2026-09-21 12:00:00','盒马-退款','盒马商户','退款','收入','0.44','/','已退款¥0.70','refund1']]);
+ assert.equal(partial[1].kind,'REFUND');
+ assert.equal(resolveRefund(partial[1],refundContext([],partial)).id,'import-'+partial[0].identity);
+ assert.equal(resolveRefund(partial[1],refundContext([],partial)).reason,'已按退款状态标注金额关联');
+ // 全额退款：两侧同为「已全额退款」，商户名差异不阻断。
+ const full=parseRows([wh,
+  ['2026-09-20 12:00:00','商户消费','淘宝平台','订单','支出','59.28','零钱','已全额退款','paid2'],
+  ['2026-09-21 12:00:00','商户退款','淘宝平台商户','退款','收入','59.28','/','已全额退款','refund2']]);
+ assert.equal(resolveRefund(full[1],refundContext([],full)).id,'import-'+full[0].identity);
+ assert.equal(resolveRefund(full[1],refundContext([],full)).reason,'已按退款状态标注金额关联');
+ // 标注金额对不上时保持独立入账，不误配。
+ const mismatch=parseRows([wh,
+  ['2026-09-20 12:00:00','商户消费','盒马','订单','支出','10.00','零钱','已退款(¥0.50)','paid3'],
+  ['2026-09-21 12:00:00','盒马-退款','盒马商户','退款','收入','0.44','/','已退款¥0.70','refund3']]);
+ assert.equal(resolveRefund(mismatch[1],refundContext([],mismatch)).id,'');
+});
 test('standalone refund posts once, later links category without changing cash or total consumption',()=>{
  const s=new MemoryStore(fresh()),service=svc(s);service.execute({kind:'CREATE_ACCOUNT',id:'a',name:'卡',accountType:'ASSET',openingBalance:10000,openingBalanceAt:'2026-09-01T00:00:00Z'});
  service.execute({kind:'PURCHASE',id:'p',name:'餐厅',amount:4450,payer:'a',categoryId:'餐饮',occurredAt:'2026-09-20T04:00:00Z'});
