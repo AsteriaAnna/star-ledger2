@@ -1,0 +1,40 @@
+import type {AttentionItem,ExternalRecord,ImportSession} from '../importing/types.ts';
+
+export type AccountIdentity={
+ sourceSystem:string;
+ profile:string;
+ channelKey:string;
+};
+
+export type AccountMapping={
+ accountId:string;
+ rememberedAt:string;
+};
+
+export type MerchantIdentity={
+ sourceSystem:string;
+ profile:string;
+ merchantKey:string;
+};
+
+export type CategoryMapping={
+ categoryId:string;
+ rememberedAt:string;
+};
+
+export interface ResolutionMemoryRepository {
+ findAccountMapping(key:AccountIdentity):Promise<AccountMapping|null>;
+ rememberAccountMapping(key:AccountIdentity,mapping:AccountMapping):Promise<void>;
+ findMerchantCategory(key:MerchantIdentity):Promise<CategoryMapping|null>;
+ rememberMerchantCategory(key:MerchantIdentity,mapping:CategoryMapping):Promise<void>;
+}
+
+export interface ImportWorkspaceRepository {
+ getSession(id:string):Promise<ImportSession|null>;
+ putSession(session:ImportSession):Promise<void>;
+ listExternalRecords(sessionId:string):Promise<ExternalRecord[]>;
+ putExternalRecords(records:ExternalRecord[]):Promise<void>;
+ listAttentionItems(sessionId:string):Promise<AttentionItem[]>;
+ replaceAttentionItems(sessionId:string,items:AttentionItem[]):Promise<void>;
+ clearSession(id:string):Promise<void>;
+}
