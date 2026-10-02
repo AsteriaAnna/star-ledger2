@@ -26,7 +26,7 @@ test('prepare revives one deleted source instead of creating a duplicate',async(
 test('failed source is preserved as no-effect without asking for missing amount/date',async()=>{
  const workspace=new InMemoryImportWorkspace(),service=new ImportStatementService(workspace),r=record('failed');
  const result=await service.prepare({sessionId:'s',sourceType:'EXCEL',sourceSystem:'ALIPAY',records:[r],interpretations:[interpretation(r.id,{status:'FAILED',amountFen:null,occurredAt:null,eventKind:'UNKNOWN'})],ledger:{entities:[],conflicts:[]},now:'2026-10-02T00:00:00Z'});
- assert.equal(result.records[0].disposition,'NO_EFFECT');assert.equal(result.records[0].attention.length,0);
+ assert.equal(result.records[0].disposition,'NO_EFFECT');assert.equal(result.records[0].attention.length,0);assert.equal(result.session.noEffectCount,1);assert.equal(result.session.state,'COMPLETED');
  assert.deepEqual((await workspace.listExternalRecords('s')).map(x=>x.id),['failed']);
 });
 
@@ -41,5 +41,5 @@ test('unknown accounting facts create scoped blocking attention',async()=>{
 test('non-duplicate deterministic source becomes ready without workflow confirmation',async()=>{
  const workspace=new InMemoryImportWorkspace(),service=new ImportStatementService(workspace),r=record('ready');
  const result=await service.prepare({sessionId:'s',sourceType:'EXCEL',sourceSystem:'ALIPAY',records:[r],interpretations:[interpretation(r.id)],ledger:{entities:[],conflicts:[]},now:'2026-10-02T00:00:00Z'});
- assert.equal(result.records[0].disposition,'READY');assert.deepEqual(result.records[0].attention,[]);
+ assert.equal(result.records[0].disposition,'INTERPRETED');assert.deepEqual(result.records[0].attention,[]);
 });
