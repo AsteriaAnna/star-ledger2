@@ -49,7 +49,7 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
   assertClear('accounts',id);return a;
  };
  const commands:Command[]=[];
- if(c.kind==='CORRECT_IMPORTED_EVENT') {
+ if(c.kind==='CORRECT_TRANSACTION'||c.kind==='CORRECT_IMPORTED_EVENT') {
   const t=get('transactions',c.transactionId);if(!t||t.fields.deleted_at)throw Error('TRANSACTION_UNAVAILABLE');
   assertClear('transactions',t.id);timestamp(c.correctedAt);identifier(c.sourceId);
   if(correctionSnapshot(entities,t.id)!==c.expectedSnapshot)throw Error('STALE_TRANSACTION');
@@ -70,7 +70,7 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
   }
   if(!generated.some(cmd=>cmd.entity.type==='consumption_effects'))for(const e of entities.filter(e=>e.type==='consumption_effects'&&e.fields.transaction_id===t.id&&e.fields.amount!==0))result.push({action:'PATCH_FIELD',entity:{type:e.type,id:e.id,fields:{amount:0}}});
   result.push({action:'PATCH_FIELD',entity:{type:'transactions',id:t.id,fields:{posting_plan:JSON.stringify(postings)}}});
-  result.push(create({type:'source_records',id:c.sourceId,fields:{transaction_id:t.id,source_type:'MANUAL',platform:'星账 · 导入修正',created_at:c.correctedAt,raw_payload:JSON.stringify({kind:'IMPORT_CORRECTION',before:JSON.parse(c.expectedSnapshot),after:postings,event:proposed.fields,evidence:c.replacement.source?.rawPayload||null})}}));
+  result.push(create({type:'source_records',id:c.sourceId,fields:{transaction_id:t.id,source_type:'MANUAL',platform:c.kind==='CORRECT_TRANSACTION'?'星账 · 账单修改':'星账 · 导入修正',created_at:c.correctedAt,raw_payload:JSON.stringify({kind:c.kind==='CORRECT_TRANSACTION'?'TRANSACTION_CORRECTION':'IMPORT_CORRECTION',before:JSON.parse(c.expectedSnapshot),after:postings,event:proposed.fields,evidence:c.replacement.source?.rawPayload||null})}}));
   return result;
  }
  if(c.kind==='UNLINK_RETURN') {
