@@ -28,8 +28,7 @@ test('deleted imported transaction restores and corrects in the same accounting 
 
 test('invalid later intent prevents the whole import accounting batch from partially committing',t=>{
  const p=pair(t),service=new BusinessAccountingService(p.a.store,'a');
- const execution=planImportExecution({evidenceUpdates:[],newRecords:[{externalRecordId:'good-source',intent:intent('good')},{externalRecordId:'bad-source',intent:{...intent('bad'),amount:-1}}],revivals:[],skippedDuplicateIds:[],noEffectRecordIds:[],blockedRecordIds:[],attentionRecordIds:[]},project(p.a.store.allOperations()),at);
- assert.throws(()=>service.executeBatch(execution.commands),/INVALID_MONEY/);
+ assert.throws(()=>planImportExecution({evidenceUpdates:[],newRecords:[{externalRecordId:'good-source',intent:intent('good')},{externalRecordId:'bad-source',intent:{...intent('bad'),amount:-1}}],revivals:[],skippedDuplicateIds:[],noEffectRecordIds:[],blockedRecordIds:[],attentionRecordIds:[]},project(p.a.store.allOperations()),at),/INVALID_MONEY/);
  assert.equal(p.a.store.get('transactions','good'),undefined);assert.equal(p.a.store.get('transactions','bad'),undefined);
 });
 
