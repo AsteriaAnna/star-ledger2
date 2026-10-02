@@ -27,7 +27,7 @@ export type RefundRelationResolution={
 type SourceEvidence={transactionId:string;order:string;profile:string;original:Record<string,string>};
 
 const json=(v:unknown):any=>{try{return JSON.parse(String(v));}catch{return undefined;}};
-const merchant=(value:string)=>value.replace(/[-－—]退款$|^退款[-－—]?|\s/g,'');
+const merchant=(value:string)=>value.replace(/(?:[-－—]?退款)$|^退款[-－—]?|\s/g,'');
 
 export function refundAnnotation(statusText:string):{kind:'full'}|{kind:'partial';amountFen:number}|null{
  if(!statusText)return null;
