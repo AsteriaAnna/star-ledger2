@@ -9,6 +9,7 @@ import {summarizeSession} from '../importing/attention.ts';
 export type ImportExecutionPlan={
  commands:BusinessCommand[];
  createdIds:string[];
+ createdRecordIds:string[];
  revivedIds:string[];
  skippedDuplicateIds:string[];
  noEffectRecordIds:string[];
@@ -27,10 +28,10 @@ function advance(snapshot:LedgerSnapshot,command:BusinessCommand){
  */
 export function planImportExecution(plan:ImportCommitPlan,snapshot:LedgerSnapshot,now:string):ImportExecutionPlan{
  let working=snapshot;const commands:BusinessCommand[]=[];
- const created:string[]=[],revived:string[]=[];
+ const created:string[]=[],createdRecords:string[]=[],revived:string[]=[];
 
- for(const intent of plan.newIntents){
-  const next=advance(working,intent);working=next.snapshot;commands.push(intent);created.push(intent.id);
+ for(const entry of plan.newRecords){
+  const intent=entry.intent,next=advance(working,intent);working=next.snapshot;commands.push(intent);created.push(intent.id);createdRecords.push(entry.externalRecordId);
  }
 
  for(const revival of plan.revivals){
@@ -45,7 +46,7 @@ export function planImportExecution(plan:ImportCommitPlan,snapshot:LedgerSnapsho
  }
 
  return {
-  commands,createdIds:created,revivedIds:revived,
+  commands,createdIds:created,createdRecordIds:createdRecords,revivedIds:revived,
   skippedDuplicateIds:[...plan.skippedDuplicateIds],
   noEffectRecordIds:[...plan.noEffectRecordIds],
   blockedRecordIds:[...plan.blockedRecordIds]
