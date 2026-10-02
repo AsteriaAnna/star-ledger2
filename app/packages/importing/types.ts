@@ -94,6 +94,7 @@ export type ImportSession={
  sourceCount:number;
  committedCount:number;
  skippedDuplicateCount:number;
+ noEffectCount:number;
  blockingAttentionCount:number;
  nonBlockingAttentionCount:number;
  failureCode:string|null;
