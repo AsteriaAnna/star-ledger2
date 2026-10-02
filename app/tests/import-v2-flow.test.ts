@@ -12,14 +12,14 @@ test('legacy Draft workflow flags no longer decide whether a known record can au
  const service=new ImportStatementService(new InMemoryImportWorkspace());
  const out=await resolveLegacyImportBatch({drafts:[draft()],sessionId:'s',ledger,now,service});
  assert.equal(out.result.records[0].ledgerState,'READY_FOR_LEDGER');
- assert.equal(out.plan.newIntents.length,1);assert.deepEqual(out.plan.blockedRecordIds,[]);
+ assert.equal(out.plan.newRecords.length,1);assert.deepEqual(out.plan.blockedRecordIds,[]);
  assert.equal(out.result.records[0].attention.some(item=>item.kind==='ACCOUNT'&&item.blocking),false);
 });
 
 test('failed source row becomes no-effect instead of a user review task',async()=>{
  const service=new ImportStatementService(new InMemoryImportWorkspace());
  const out=await resolveLegacyImportBatch({drafts:[draft({status:'FAILED',workflow:'review',issue:'旧版仍显示待处理'})],sessionId:'s',ledger,now,service});
- assert.deepEqual(out.plan.noEffectRecordIds,['row-1']);assert.equal(out.plan.newIntents.length,0);
+ assert.deepEqual(out.plan.noEffectRecordIds,['row-1']);assert.equal(out.plan.newRecords.length,0);
 });
 
 test('split funding with unknown allocation remains the explicit blocking exception',async()=>{
