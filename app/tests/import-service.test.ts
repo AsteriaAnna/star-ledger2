@@ -58,7 +58,7 @@ const account=(id:string,name:string):Entity=>({type:'accounts',id,fields:{name,
 test('import service uses memory only after deterministic account resolution cannot decide',async()=>{
  const memories=new MemoryRepo(),service=new ImportStatementService(new InMemoryImportWorkspace(),memories);
  const ledger={entities:[account('a1','自定义一'),account('a2','自定义二')],conflicts:[]};
- const request={eventKind:'PURCHASE',platform:'支付宝',profile:'本人',channelRaw:'余额',role:'ACCOUNT' as const,sponsored:false};
+ const request={eventKind:'PURCHASE',sourceSystem:'ALIPAY',platform:'支付宝',profile:'本人',channelRaw:'余额',role:'ACCOUNT' as const,sponsored:false};
  let result=await service.resolveFundingAccount(request,ledger);assert.equal(result.state,'UNRESOLVED');
  await service.rememberFundingAccount(request,'a2',ledger,'2026-10-02T00:00:00Z');
  result=await service.resolveFundingAccount(request,ledger);assert.equal(result.state,'RESOLVED');assert.equal(result.accountId,'a2');
@@ -66,7 +66,7 @@ test('import service uses memory only after deterministic account resolution can
 
 test('deterministic unique account outranks stale remembered mapping',async()=>{
  const memories=new MemoryRepo(),service=new ImportStatementService(new InMemoryImportWorkspace(),memories);
- const request={eventKind:'PURCHASE',platform:'支付宝',profile:'本人',channelRaw:'余额',role:'ACCOUNT' as const,sponsored:false};
+ const request={eventKind:'PURCHASE',sourceSystem:'ALIPAY',platform:'支付宝',profile:'本人',channelRaw:'余额',role:'ACCOUNT' as const,sponsored:false};
  const before={entities:[account('old','旧账户')],conflicts:[]};
  await service.rememberFundingAccount(request,'old',before,'2026-10-01T00:00:00Z');
  const ledger={entities:[account('old','旧账户'),account('wallet','支付宝余额')],conflicts:[]};
