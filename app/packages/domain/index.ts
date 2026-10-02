@@ -1,5 +1,5 @@
 export type Json = null | boolean | number | string | Json[] | {[key:string]:Json};
-export type EntityType = 'transactions'|'accounts'|'source_records'|'balance_movements'|'consumption_effects'|'transaction_links'|'import_rules';
+export type EntityType = 'transactions'|'accounts'|'source_records'|'balance_movements'|'consumption_effects'|'transaction_links'|'balance_anchors'|'import_rules';
 export type Entity = {type:EntityType; id:string; fields:Record<string,Json>};
 export type Operation = {id:string; device:string; seq:number; command_id:string; command_index:number; command_size:number; parents:string[]; action:'CREATE_ENTITY'|'PATCH_FIELD'|'DELETE_ENTITY'|'RESOLVE_CONFLICT'; entity:Entity;};
 export type Batch = {version:1; device:string; seq:number; operations:Operation[]; checksum:string};
@@ -20,7 +20,8 @@ export const fields:Record<EntityType,Record<string,'string'|'money'|'nullable'>
  source_records:{transaction_id:'string',source_type:'string',platform:'string',raw_payload:'string',created_at:'string'},
  balance_movements:{transaction_id:'string',account_id:'nullable',amount:'money',created_at:'string'},
  consumption_effects:{transaction_id:'string',amount:'money',category_id:'nullable',subcategory_id:'nullable',effective_at:'string',created_at:'string'},
- transaction_links:{from_transaction_id:'string',to_transaction_id:'string',type:'string',deleted_at:'nullable'}
+ transaction_links:{from_transaction_id:'string',to_transaction_id:'string',type:'string',deleted_at:'nullable'},
+ balance_anchors:{account_id:'string',observed_balance:'money',observed_at:'string',source_type:'string',created_at:'string',deleted_at:'nullable'}
 };
 export function validate(op:Operation):void {
  if(!op || !/^[\w-]+$/.test(op.device) || !Number.isSafeInteger(op.seq) || op.seq<1 || op.id!==`${op.device}:${op.seq}`) throw Error('INVALID_OPERATION');
