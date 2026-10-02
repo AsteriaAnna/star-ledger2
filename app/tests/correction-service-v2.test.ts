@@ -63,3 +63,44 @@ test('ordinary correction does not manufacture a new SourceRecord',t=>{
  assert.equal(x.snapshot().entities.filter(e=>e.type==='source_records').length,sourcesBefore);
  assert.equal(x.a.store.get('transactions','buy')?.fields.display_amount,11000);
 });
+
+
+test('account correction moves only the corrected purchase movement and preserves linked refund destination',t=>{
+ const x=setup(t);x.service.execute({kind:'CREATE_ACCOUNT',id:'wallet',name:'wallet',accountType:'ASSET',openingBalance:50000,openingBalanceAt:start});
+ const before=x.snapshot();
+ const plan=planTransactionCorrection({transactionId:'buy',replacement:{...replacement(10000),payer:'wallet'},expectedSnapshot:correctionSnapshot(before.entities,'buy'),correctedAt:'2026-10-02T00:00:00Z'},before);
+ x.service.executeBatch(plan.commands);
+ const after=x.snapshot();
+ assert.equal(accountBalance(after,'bank',end).balance,103000);
+ assert.equal(accountBalance(after,'wallet',end).balance,40000);
+ assert.deepEqual(plan.relationReviewIds,[]);
+});
+
+test('time correction updates both transaction time and consumption effective time',t=>{
+ const x=setup(t),before=x.snapshot(),moved='2026-09-12T08:30:00Z';
+ const plan=planTransactionCorrection({transactionId:'buy',replacement:replacement(10000,moved),expectedSnapshot:correctionSnapshot(before.entities,'buy'),correctedAt:'2026-10-02T00:00:00Z'},before);
+ x.service.executeBatch(plan.commands);
+ assert.equal(x.a.store.get('transactions','buy')?.fields.occurred_at,moved);
+ assert.equal(x.a.store.get('consumption_effects','buy:effect')?.fields.effective_at,moved);
+ assert.deepEqual(plan.relationReviewIds,[]);
+});
+
+test('type correction is allowed and invalidates only the relation that no longer makes sense',t=>{
+ const x=setup(t),before=x.snapshot();
+ const plan=planTransactionCorrection({transactionId:'buy',replacement:{kind:'INCOME',id:'buy',name:'Salary correction',amount:10000,destination:'bank',occurredAt:buyAt,note:'corrected type'},expectedSnapshot:correctionSnapshot(before.entities,'buy'),correctedAt:'2026-10-02T00:00:00Z'},before);
+ assert.deepEqual(plan.relationReviewIds,['refund']);
+ x.service.executeBatch(plan.commands);
+ const row=x.a.store.get('transactions','buy');
+ assert.equal(row?.fields.event_type,'INCOME');assert.equal(row?.fields.display_name,'Salary correction');assert.equal(row?.fields.note,'corrected type');
+ assert.equal(x.snapshot().entities.some(e=>e.type==='transaction_links'&&!e.fields.deleted_at&&e.fields.from_transaction_id==='refund'),false);
+});
+
+test('manual transaction uses the same correction service as imported transactions',t=>{
+ const p=pair(t),service=new BusinessAccountingService(p.a.store,'a');
+ service.execute({kind:'CREATE_ACCOUNT',id:'bank',name:'bank',accountType:'ASSET',openingBalance:100000,openingBalanceAt:start});
+ service.execute({kind:'PURCHASE',id:'manual',name:'Old',amount:5000,payer:'bank',occurredAt:buyAt,note:'before'});
+ const before=project(p.a.store.allOperations());
+ const plan=planTransactionCorrection({transactionId:'manual',replacement:{kind:'PURCHASE',id:'manual',name:'New',amount:5500,payer:'bank',occurredAt:buyAt,note:'after',categoryId:'购物'},expectedSnapshot:correctionSnapshot(before.entities,'manual'),correctedAt:'2026-10-02T00:00:00Z'},before);
+ service.executeBatch(plan.commands);
+ assert.equal(p.a.store.get('transactions','manual')?.fields.display_name,'New');assert.equal(p.a.store.get('transactions','manual')?.fields.note,'after');assert.equal(p.a.store.get('transactions','manual')?.fields.display_amount,5500);
+});
