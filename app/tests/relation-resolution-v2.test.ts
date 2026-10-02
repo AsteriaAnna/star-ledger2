@@ -24,3 +24,8 @@ test('unlinked refund remains a valid unresolved relation, not a blocking accoun
  const result=resolveRefundRelation({...input,displayName:'不存在的商户'},[]);
  assert.equal(result.state,'UNRESOLVED');assert.equal(result.originalId,null);
 });
+
+test('missing strong order match may fall back only to a weak suggestion',()=>{
+ const result=resolveRefundRelation({...input,originalOrderId:'missing-order'},[tx('t1')]);
+ assert.equal(result.state,'SUGGESTED');assert.equal(result.originalId,null);assert.equal(result.evidence,'MERCHANT_AMOUNT_TIME');
+});
