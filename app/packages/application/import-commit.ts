@@ -1,11 +1,12 @@
 import type {LedgerIntent} from '../domain/accounting.ts';
 import type {ExternalRecord} from '../importing/types.ts';
-import {buildImportedLedgerIntent} from './import-ledger-intent.ts';
+import {buildImportedLedgerIntent,importedSourceEvidence} from './import-ledger-intent.ts';
 import type {ResolveImportResult,ResolvedImportRecord} from './import-service.ts';
 
 export type ImportRevival={transactionId:string;replacement:LedgerIntent;externalRecordId:string};
 export type ImportCommitPlan={
  newRecords:{externalRecordId:string;intent:LedgerIntent}[];
+ evidenceUpdates:{externalRecordId:string;transactionId:string;source:ReturnType<typeof importedSourceEvidence>}[];
  revivals:ImportRevival[];
  skippedDuplicateIds:string[];
  noEffectRecordIds:string[];
@@ -20,11 +21,12 @@ function asPostable(record:ResolvedImportRecord):ResolvedImportRecord{
 
 export function planImportCommit(result:ResolveImportResult,records:ExternalRecord[]):ImportCommitPlan{
  const sources=sourceMap(records);
- const plan:ImportCommitPlan={newRecords:[],revivals:[],skippedDuplicateIds:[],noEffectRecordIds:[],blockedRecordIds:[],attentionRecordIds:[]};
+ const plan:ImportCommitPlan={newRecords:[],evidenceUpdates:[],revivals:[],skippedDuplicateIds:[],noEffectRecordIds:[],blockedRecordIds:[],attentionRecordIds:[]};
  for(const record of result.records){
   const source=sources.get(record.externalRecordId);if(!source)throw Error('MISSING_EXTERNAL_RECORD');
   if(record.attention.length)plan.attentionRecordIds.push(record.externalRecordId);
   if(record.disposition==='SKIP_DUPLICATE'){plan.skippedDuplicateIds.push(record.externalRecordId);continue;}
+  if(record.disposition==='SOURCE_UPDATE'){if(!record.transactionId)throw Error('MISSING_SOURCE_UPDATE_TRANSACTION');plan.evidenceUpdates.push({externalRecordId:record.externalRecordId,transactionId:record.transactionId,source:importedSourceEvidence(source)});plan.blockedRecordIds.push(record.externalRecordId);continue;}
   if(record.disposition==='NO_EFFECT'){plan.noEffectRecordIds.push(record.externalRecordId);continue;}
   if(record.disposition==='NEEDS_ATTENTION'||record.ledgerState==='NEEDS_ATTENTION'){plan.blockedRecordIds.push(record.externalRecordId);continue;}
   if(record.disposition==='REVIVE_EXISTING'){
