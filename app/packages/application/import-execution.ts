@@ -31,13 +31,13 @@ export function planImportExecution(plan:ImportCommitPlan,snapshot:LedgerSnapsho
  let working=snapshot;const commands:BusinessCommand[]=[];
  const created:string[]=[],createdRecords:string[]=[],revived:string[]=[],revivedRecords:string[]=[];
 
+ for(const entry of plan.newRecords){
+  const intent=entry.intent,next=advance(working,intent);working=next.snapshot;commands.push(intent);created.push(intent.id);createdRecords.push(entry.externalRecordId);
+ }
+
  for(const update of plan.evidenceUpdates){
   const command:BusinessCommand={kind:'ATTACH_SOURCE_EVIDENCE',transactionId:update.transactionId,source:update.source};
   const next=advance(working,command);working=next.snapshot;commands.push(command);
- }
-
- for(const entry of plan.newRecords){
-  const intent=entry.intent,next=advance(working,intent);working=next.snapshot;commands.push(intent);created.push(intent.id);createdRecords.push(entry.externalRecordId);
  }
 
  for(const revival of plan.revivals){
