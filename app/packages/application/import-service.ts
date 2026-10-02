@@ -129,6 +129,10 @@ export class ImportStatementService {
     items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'ACCOUNT',question:account.reason,blocking:false,candidates:accountCandidates,createdAt:input.now}));
    }
 
+   if(interpretation.eventKind==='WITHDRAWAL'&&(source.facts.feeFen===null||source.facts.feeFen===undefined)){
+    items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'AMOUNT',question:'无法确定这笔提现的手续费金额',blocking:true,candidates:[],createdAt:input.now}));
+   }
+
    if(interpretation.eventKind==='REPAYMENT'){
     items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'TRANSFER_ENDPOINTS',question:'还款需要确认转出资产账户和还款的负债账户',blocking:true,candidates:accountCandidates,createdAt:input.now}));
    }else if(['INTERNAL_TRANSFER','WITHDRAWAL'].includes(interpretation.eventKind)){
