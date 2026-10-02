@@ -85,6 +85,9 @@ export type AttentionItem={
 
 export type ImportSessionState='PROCESSING'|'NEEDS_ATTENTION'|'COMPLETED'|'FAILED'|'ROLLED_BACK';
 
+export type ImportRecordOutcomeState='COMMITTED'|'SKIPPED_DUPLICATE'|'NO_EFFECT'|'BLOCKED';
+export type ImportRecordOutcome={sessionId:string;externalRecordId:string;state:ImportRecordOutcomeState;transactionId:string|null;updatedAt:string};
+
 export type ImportSession={
  id:string;
  sourceType:ImportSourceType;
