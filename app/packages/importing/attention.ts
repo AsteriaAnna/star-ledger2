@@ -6,7 +6,7 @@ export function attentionId(sessionId:string,externalRecordId:string,kind:Attent
 
 export function summarizeSession(session:ImportSession,items:AttentionItem[],updatedAt:string):ImportSession{
  const blocking=items.filter(item=>item.blocking).length,nonBlocking=items.length-blocking;
- const state:ImportSessionState=session.state==='FAILED'||session.state==='ROLLED_BACK'?session.state:blocking?'NEEDS_ATTENTION':session.sourceCount>0&&session.committedCount+session.skippedDuplicateCount>=session.sourceCount?'COMPLETED':'PROCESSING';
+ const state:ImportSessionState=session.state==='FAILED'||session.state==='ROLLED_BACK'?session.state:blocking?'NEEDS_ATTENTION':session.sourceCount>0&&session.committedCount+session.skippedDuplicateCount+session.noEffectCount>=session.sourceCount?'COMPLETED':'PROCESSING';
  return {...session,updatedAt,state,blockingAttentionCount:blocking,nonBlockingAttentionCount:nonBlocking};
 }
 
