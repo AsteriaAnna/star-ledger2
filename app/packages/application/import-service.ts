@@ -134,7 +134,7 @@ export class ImportStatementService {
    }
 
    if(interpretation.eventKind==='REPAYMENT'){
-    items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'TRANSFER_ENDPOINTS',question:'还款需要确认转出资产账户和还款的负债账户',blocking:true,candidates:accountCandidates,createdAt:input.now}));
+    items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'TRANSFER_ENDPOINTS',question:'还款已记录，仍需确认还款的负债账户',blocking:false,candidates:accountCandidates,createdAt:input.now}));
    }else if(['INTERNAL_TRANSFER','WITHDRAWAL'].includes(interpretation.eventKind)){
     items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'TRANSFER_ENDPOINTS',question:'已记录资金变化，另一端账户仍待补充',blocking:false,candidates:[],createdAt:input.now}));
    }
