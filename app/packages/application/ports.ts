@@ -32,6 +32,7 @@ export interface ResolutionMemoryRepository {
 
 export interface ImportWorkspaceRepository {
  getSession(id:string):Promise<ImportSession|null>;
+ listSessions():Promise<ImportSession[]>;
  putSession(session:ImportSession):Promise<void>;
  listExternalRecords(sessionId:string):Promise<ExternalRecord[]>;
  putExternalRecords(records:ExternalRecord[]):Promise<void>;
