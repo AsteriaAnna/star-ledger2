@@ -8,7 +8,7 @@ const attention={id:'a',sessionId:'s',externalRecordId:'r',kind:'ACCOUNT',questi
 
 test('manual backup workspace validation preserves a recoverable pending import',()=>{
  const value={sessions:{s:session},records:{s:[record]},attention:{s:[attention]}};
- assert.deepEqual(validateImportWorkspace(value),value);
+ assert.deepEqual(validateImportWorkspace(value),{...value,outcomes:{}});
 });
 
 test('backup restore rejects workspace rows assigned to another session',()=>{
