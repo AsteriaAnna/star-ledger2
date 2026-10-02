@@ -6,7 +6,6 @@ export type CorrectionRequest={
  transactionId:string;
  replacement:LedgerIntent;
  expectedSnapshot:string;
- sourceId:string;
  correctedAt:string;
 };
 
@@ -50,7 +49,7 @@ export function planTransactionCorrection(request:CorrectionRequest,snapshot:Led
   kind:'CORRECT_TRANSACTION',transactionId:request.transactionId,
   replacement:unlinkedReplacement(request.replacement),
   expectedSnapshot:correctionSnapshot(working.entities,request.transactionId),
-  sourceId:request.sourceId,correctedAt:request.correctedAt
+  correctedAt:request.correctedAt
  };
  const corrected=advance(working,correction);working=corrected.snapshot;commands.push(correction);
 
