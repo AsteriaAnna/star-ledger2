@@ -14,25 +14,25 @@ test('funding channel descriptor preserves bank/card identity',()=>{
 });
 test('unique explicit channel resolves without user confirmation',()=>{
  const entities=[account('a1','招商银行卡(1234)','ASSET','1234'),account('a2','工资卡','ASSET','5678')];
- const r=resolveAccount({eventKind:'PURCHASE',platform:'支付宝',profile:'本人',channelRaw:'招商银行储蓄卡(1234)',role:'ACCOUNT',sponsored:false},entities,[]);
+ const r=resolveAccount({eventKind:'PURCHASE',sourceSystem:'ALIPAY',platform:'支付宝',profile:'本人',channelRaw:'招商银行储蓄卡(1234)',role:'ACCOUNT',sponsored:false},entities,[]);
  assert.equal(r.state,'RESOLVED');assert.equal(r.accountId,'a1');
 });
 test('remembered account wins when still valid',()=>{
  const entities=[account('a1','自定义名称','ASSET','')];
- const r=resolveAccount({eventKind:'PURCHASE',platform:'支付宝',profile:'本人',channelRaw:'余额',role:'ACCOUNT',sponsored:false,rememberedAccountId:'a1'},entities,[]);
+ const r=resolveAccount({eventKind:'PURCHASE',sourceSystem:'ALIPAY',platform:'支付宝',profile:'本人',channelRaw:'余额',role:'ACCOUNT',sponsored:false,rememberedAccountId:'a1'},entities,[]);
  assert.equal(r.state,'RESOLVED');assert.equal(r.accountId,'a1');assert.equal(r.reason,'使用已确认的账户关系');
 });
 test('compound funding never guesses one account',()=>{
- const r=resolveAccount({eventKind:'PURCHASE',platform:'支付宝',profile:'本人',channelRaw:'余额+招商银行储蓄卡(1234)',role:'ACCOUNT',sponsored:false},[account('a1','支付宝余额','ASSET')],[]);
+ const r=resolveAccount({eventKind:'PURCHASE',sourceSystem:'ALIPAY',platform:'支付宝',profile:'本人',channelRaw:'余额+招商银行储蓄卡(1234)',role:'ACCOUNT',sponsored:false},[account('a1','支付宝余额','ASSET')],[]);
  assert.equal(r.state,'SPLIT');assert.equal(r.accountId,null);
 });
 test('sponsored purchase has no own-account question',()=>{
- const r=resolveAccount({eventKind:'PURCHASE',platform:'微信',profile:'本人',channelRaw:'亲属卡',role:'ACCOUNT',sponsored:true},[],[]);
+ const r=resolveAccount({eventKind:'PURCHASE',sourceSystem:'WECHAT',platform:'微信',profile:'本人',channelRaw:'亲属卡',role:'ACCOUNT',sponsored:true},[],[]);
  assert.equal(r.state,'NOT_APPLICABLE');
 });
 
 test('remembered mapping cannot override a unique deterministic channel match',()=>{
  const entities=[account('a1','支付宝余额','ASSET',''),account('a2','旧的自定义账户','ASSET','')];
- const r=resolveAccount({eventKind:'PURCHASE',platform:'支付宝',profile:'本人',channelRaw:'余额',role:'ACCOUNT',sponsored:false,rememberedAccountId:'a2'},entities,[]);
+ const r=resolveAccount({eventKind:'PURCHASE',sourceSystem:'ALIPAY',platform:'支付宝',profile:'本人',channelRaw:'余额',role:'ACCOUNT',sponsored:false,rememberedAccountId:'a2'},entities,[]);
  assert.equal(r.state,'RESOLVED');assert.equal(r.accountId,'a1');assert.equal(r.reason,'按明确资金渠道唯一匹配');
 });
