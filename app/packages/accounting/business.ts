@@ -233,7 +233,7 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
  if(c.kind==='RESTORE_TRANSACTION') {
   const original=get('transactions',c.transactionId);if(!original||!original.fields.deleted_at||original.fields.purged_at)throw Error('TRANSACTION_UNAVAILABLE');
   assertClear('transactions',c.transactionId);
-  return [{action:'PATCH_FIELD',entity:{type:'transactions',id:c.transactionId,fields:{deleted_at:null}}}];
+  return [{action:'RESOLVE_CONFLICT',entity:{type:'transactions',id:c.transactionId,fields:{deleted_at:null}}}];
  }
  if(c.kind==='DELETE_TRANSACTION') {
   timestamp(c.deletedAt);const original=get('transactions',c.transactionId);
