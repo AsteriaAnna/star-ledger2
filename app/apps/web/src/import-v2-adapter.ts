@@ -43,7 +43,7 @@ export function legacyDraftToExternalRecord(draft:Draft,sessionId:string,capture
   precision:draft.precision||'invalid'
  };
  return {
-  id:observationId??draft.itemId||draft.identity||draft.key,
+  id:observationId??(draft.itemId||draft.identity||draft.key),
   sessionId,
   sourceIdentity:draft.identity||draft.key,
   sourceType:draft.sourceType,
