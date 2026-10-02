@@ -3,7 +3,7 @@ import type {LedgerSnapshot} from '../accounting/index.ts';
 import {applyCommands,correctionSnapshot,interpret} from '../accounting/business.ts';
 import {planTransactionCorrection} from './correction-service.ts';
 import type {ImportCommitPlan} from './import-commit.ts';
-import type {AttentionItem,ImportSession} from '../importing/types.ts';
+import type {AttentionItem,ImportRecordOutcome,ImportSession} from '../importing/types.ts';
 import {summarizeSession} from '../importing/attention.ts';
 
 export type ImportExecutionPlan={
@@ -11,6 +11,7 @@ export type ImportExecutionPlan={
  createdIds:string[];
  createdRecordIds:string[];
  revivedIds:string[];
+ revivedRecordIds:string[];
  skippedDuplicateIds:string[];
  noEffectRecordIds:string[];
  blockedRecordIds:string[];
@@ -28,7 +29,7 @@ function advance(snapshot:LedgerSnapshot,command:BusinessCommand){
  */
 export function planImportExecution(plan:ImportCommitPlan,snapshot:LedgerSnapshot,now:string):ImportExecutionPlan{
  let working=snapshot;const commands:BusinessCommand[]=[];
- const created:string[]=[],createdRecords:string[]=[],revived:string[]=[];
+ const created:string[]=[],createdRecords:string[]=[],revived:string[]=[],revivedRecords:string[]=[];
 
  for(const entry of plan.newRecords){
   const intent=entry.intent,next=advance(working,intent);working=next.snapshot;commands.push(intent);created.push(intent.id);createdRecords.push(entry.externalRecordId);
@@ -42,11 +43,11 @@ export function planImportExecution(plan:ImportCommitPlan,snapshot:LedgerSnapsho
    expectedSnapshot:correctionSnapshot(working.entities,revival.transactionId),correctedAt:now
   },working);
   for(const command of correction.commands){const next=advance(working,command);working=next.snapshot;commands.push(command);}
-  revived.push(revival.transactionId);
+  revived.push(revival.transactionId);revivedRecords.push(revival.externalRecordId);
  }
 
  return {
-  commands,createdIds:created,createdRecordIds:createdRecords,revivedIds:revived,
+  commands,createdIds:created,createdRecordIds:createdRecords,revivedIds:revived,revivedRecordIds:revivedRecords,
   skippedDuplicateIds:[...plan.skippedDuplicateIds],
   noEffectRecordIds:[...plan.noEffectRecordIds],
   blockedRecordIds:[...plan.blockedRecordIds]
@@ -57,4 +58,15 @@ export function planImportExecution(plan:ImportCommitPlan,snapshot:LedgerSnapsho
 export function completeImportSession(session:ImportSession,execution:ImportExecutionPlan,attention:AttentionItem[],now:string):ImportSession{
  const committed=execution.createdIds.length+execution.revivedIds.length;
  return summarizeSession({...session,committedCount:committed,skippedDuplicateCount:execution.skippedDuplicateIds.length,noEffectCount:execution.noEffectRecordIds.length},attention,now);
+}
+
+
+export function importRecordOutcomes(sessionId:string,execution:ImportExecutionPlan,now:string):ImportRecordOutcome[]{
+ const out:ImportRecordOutcome[]=[];
+ execution.createdRecordIds.forEach((externalRecordId,index)=>out.push({sessionId,externalRecordId,state:'COMMITTED',transactionId:execution.createdIds[index]??null,updatedAt:now}));
+ execution.revivedRecordIds.forEach((externalRecordId,index)=>out.push({sessionId,externalRecordId,state:'COMMITTED',transactionId:execution.revivedIds[index]??null,updatedAt:now}));
+ execution.skippedDuplicateIds.forEach(externalRecordId=>out.push({sessionId,externalRecordId,state:'SKIPPED_DUPLICATE',transactionId:null,updatedAt:now}));
+ execution.noEffectRecordIds.forEach(externalRecordId=>out.push({sessionId,externalRecordId,state:'NO_EFFECT',transactionId:null,updatedAt:now}));
+ execution.blockedRecordIds.forEach(externalRecordId=>out.push({sessionId,externalRecordId,state:'BLOCKED',transactionId:null,updatedAt:now}));
+ return out.sort((a,b)=>a.externalRecordId.localeCompare(b.externalRecordId));
 }
