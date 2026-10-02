@@ -13,13 +13,13 @@ const json=(value:unknown):any=>{try{return JSON.parse(String(value));}catch{ret
 
 export function findSourceMatch(identity:SourceIdentity,entities:Entity[]):SourceMatch{
  const ids=new Set<string>(),matchedBy=new Set<SourceMatch['matchedBy'][number]>();
- const rule=entities.find(e=>e.type==='import_rules'&&e.id==='source-'+identity.value);
+ const rule=identity.profile==='本人'?entities.find(e=>e.type==='import_rules'&&e.id==='source-'+identity.value):undefined;
  const linked=json(rule?.fields.value);
  if(linked?.transactionId){ids.add(String(linked.transactionId));matchedBy.add('RULE');}
  for(const source of entities.filter(e=>e.type==='source_records')){
   const payload=json(source.fields.raw_payload);if(!payload)continue;
-  if(payload.identity===identity.value){ids.add(String(source.fields.transaction_id));matchedBy.add('SOURCE_IDENTITY');continue;}
-  if(source.id==='source-'+identity.value){ids.add(String(source.fields.transaction_id));matchedBy.add('LEGACY_SOURCE_ID');continue;}
+  if(payload.identity===identity.value&&source.fields.platform===identity.platform&&(payload.profile?payload.profile===identity.profile:identity.profile==='本人')){ids.add(String(source.fields.transaction_id));matchedBy.add('SOURCE_IDENTITY');continue;}
+  if(identity.profile==='本人'&&source.id==='source-'+identity.value){ids.add(String(source.fields.transaction_id));matchedBy.add('LEGACY_SOURCE_ID');continue;}
   if(identity.orderId&&payload.order===identity.orderId&&source.fields.platform===identity.platform&&(!payload.profile||payload.profile===identity.profile)){
    ids.add(String(source.fields.transaction_id));matchedBy.add('LEGACY_ORDER');
   }
