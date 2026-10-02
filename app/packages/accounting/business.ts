@@ -97,9 +97,9 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
   const existing=entities.find(e=>e.type==='transaction_links'&&!e.fields.deleted_at&&e.fields.from_transaction_id===t.id);
   if(existing){if(existing.fields.to_transaction_id===c.originalId)return [];throw Error('RETURN_ALREADY_LINKED');}
   const ms=entities.filter(e=>e.type==='balance_movements'&&e.fields.transaction_id===t.id&&e.fields.amount!==0);
-  if(ms.length>1)throw Error('INVALID_RETURN_MOVEMENTS');
-  const destination=(ms[0]?.fields.account_id as AccountRef)??null;
-  const generated=interpret({kind:t.fields.event_type as 'REFUND'|'RETURN',id:t.id,name:String(t.fields.display_name),amount:Number(t.fields.display_amount),occurredAt:String(t.fields.occurred_at),originalId:c.originalId,destination},snapshot);
+  const destination=ms.length===1?(ms[0]?.fields.account_id as AccountRef)??null:null;
+  const destinationAllocations=ms.length>1?ms.map(m=>({accountId:(m.fields.account_id as AccountRef)??null,amount:Math.abs(Number(m.fields.amount))})):undefined;
+  const generated=interpret({kind:t.fields.event_type as 'REFUND'|'RETURN',id:t.id,name:String(t.fields.display_name),amount:Number(t.fields.display_amount),occurredAt:String(t.fields.occurred_at),originalId:c.originalId,destination,destinationAllocations},snapshot);
   const priorLinks=entities.filter(e=>e.type==='transaction_links'&&e.fields.from_transaction_id===t.id);
   const detachedSame=priorLinks.find(e=>e.fields.deleted_at&&e.fields.to_transaction_id===c.originalId);
   const result:Command[]=[];
