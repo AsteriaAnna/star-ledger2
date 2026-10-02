@@ -1,10 +1,10 @@
-import type {AccountRef,LedgerIntent} from '../domain/accounting.ts';
+import type {AccountRef,BalanceAllocation,LedgerIntent} from '../domain/accounting.ts';
 
 type Base={transactionId:string;amount:number;occurredAt?:string;name?:string;note?:string};
-export type SpendRecord=Base&{action:'SPEND';payer:AccountRef;categoryId?:string;funding?:'OWN'|'EXTERNAL_SPONSOR'};
+export type SpendRecord=Base&{action:'SPEND';payer:AccountRef;payerAllocations?:BalanceAllocation[];categoryId?:string;funding?:'OWN'|'EXTERNAL_SPONSOR'};
 export type ReceiveRecord=Base&(
  {action:'RECEIVE';meaning?:'INCOME';destination:AccountRef}|
- {action:'RECEIVE';meaning:'REFUND';destination:AccountRef;originalId?:string|null;funding?:'OWN'|'EXTERNAL_SPONSOR';categoryId?:string}
+ {action:'RECEIVE';meaning:'REFUND';destination:AccountRef;destinationAllocations?:BalanceAllocation[];originalId?:string|null;funding?:'OWN'|'EXTERNAL_SPONSOR';categoryId?:string}
 );
 export type TransferRecord=Base&(
  {action:'TRANSFER';meaning:'BETWEEN_OWN';from:AccountRef;to:AccountRef}|
@@ -26,13 +26,13 @@ const base=(request:ManualRecordRequest,now:string)=>({
 export function buildManualLedgerIntent(request:ManualRecordRequest,now:string):LedgerIntent{
  const common=base(request,now);
  if(request.action==='SPEND'){
-  if(request.funding==='EXTERNAL_SPONSOR'&&request.payer!==null)throw Error('SPONSOR_HAS_OWN_ACCOUNT');
-  return {...common,kind:'PURCHASE',payer:request.payer,categoryId:request.categoryId,funding:request.funding??'OWN'};
+  if(request.funding==='EXTERNAL_SPONSOR'&&(request.payer!==null||request.payerAllocations?.length))throw Error('SPONSOR_HAS_OWN_ACCOUNT');
+  return {...common,kind:'PURCHASE',payer:request.payer,payerAllocations:request.payerAllocations,categoryId:request.categoryId,funding:request.funding??'OWN'};
  }
  if(request.action==='RECEIVE'){
   if(request.meaning==='REFUND'){
-   if(request.funding==='EXTERNAL_SPONSOR'&&request.destination!==null)throw Error('SPONSORED_REFUND_HAS_OWN_ACCOUNT');
-   return {...common,kind:'REFUND',destination:request.destination,originalId:request.originalId??null,funding:request.funding??'OWN',categoryId:request.categoryId};
+   if(request.funding==='EXTERNAL_SPONSOR'&&(request.destination!==null||request.destinationAllocations?.length))throw Error('SPONSORED_REFUND_HAS_OWN_ACCOUNT');
+   return {...common,kind:'REFUND',destination:request.destination,destinationAllocations:request.destinationAllocations,originalId:request.originalId??null,funding:request.funding??'OWN',categoryId:request.categoryId};
   }
   return {...common,kind:'INCOME',destination:request.destination};
  }
