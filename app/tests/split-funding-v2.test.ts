@@ -43,3 +43,15 @@ test('correction atomically replaces a single payer with split funding',t=>{
  assert.deepEqual(active.map(e=>[e.fields.account_id,e.fields.amount]).sort(),[['bank',-7500],['wallet',-2500]].sort());
  assert.equal(accountBalance(snap,'wallet',end).balance,47500);assert.equal(accountBalance(snap,'bank',end).balance,42500);assert.equal(consumptionInPeriod(snap,start,end),10000);
 });
+
+
+test('split refund can detach and relink without collapsing its funding destinations',t=>{
+ const x=setup(t);
+ x.service.execute({kind:'PURCHASE',id:'buy',name:'split',amount:10000,payer:null,payerAllocations:[{accountId:'wallet',amount:3000},{accountId:'bank',amount:7000}],occurredAt:at,categoryId:'餐饮'});
+ x.service.execute({kind:'REFUND',id:'refund',name:'refund',amount:4000,originalId:'buy',destination:null,destinationAllocations:[{accountId:'wallet',amount:1000},{accountId:'bank',amount:3000}],occurredAt:refundAt});
+ x.service.execute({kind:'UNLINK_RETURN',transactionId:'refund',detachedAt:'2026-09-21T00:00:00Z'});
+ x.service.execute({kind:'LINK_RETURN',transactionId:'refund',originalId:'buy'});
+ const snap=x.snapshot(),moves=snap.entities.filter(e=>e.type==='balance_movements'&&e.fields.transaction_id==='refund'&&e.fields.amount!==0);
+ assert.deepEqual(moves.map(e=>[e.fields.account_id,e.fields.amount]).sort(),[['bank',3000],['wallet',1000]].sort());
+ assert.equal(consumptionInPeriod(snap,start,end),6000);
+});
