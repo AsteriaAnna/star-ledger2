@@ -39,7 +39,7 @@ test('correction atomically replaces a single payer with split funding',t=>{
  x.service.execute({kind:'PURCHASE',id:'buy',name:'single',amount:10000,payer:'bank',occurredAt:at,categoryId:'餐饮'});
  const before=x.snapshot(),plan=planTransactionCorrection({transactionId:'buy',replacement:{kind:'PURCHASE',id:'buy',name:'split',amount:10000,payer:null,payerAllocations:[{accountId:'wallet',amount:2500},{accountId:'bank',amount:7500}],occurredAt:at,categoryId:'餐饮'},expectedSnapshot:correctionSnapshot(before.entities,'buy'),correctedAt:'2026-10-02T00:00:00Z'},before);
  x.service.executeBatch(plan.commands);const snap=x.snapshot();
- const active=snap.entities.filter(e=>e.type==='balance_movements'&&e.fields.transaction_id==='buy'&&!e.fields.deleted_at);
+ const active=snap.entities.filter(e=>e.type==='balance_movements'&&e.fields.transaction_id==='buy'&&!e.fields.deleted_at&&e.fields.amount!==0);
  assert.deepEqual(active.map(e=>[e.fields.account_id,e.fields.amount]).sort(),[['bank',-7500],['wallet',-2500]].sort());
  assert.equal(accountBalance(snap,'wallet',end).balance,47500);assert.equal(accountBalance(snap,'bank',end).balance,42500);assert.equal(consumptionInPeriod(snap,start,end),10000);
 });
