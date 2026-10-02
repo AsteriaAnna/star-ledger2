@@ -19,7 +19,7 @@ async function resolve(r:ExternalRecord,i:EventInterpretation,entities:Entity[]=
 test('ready purchase with unknown account creates unresolved movement rather than sponsor semantics',async()=>{
  const r=record('purchase'),out=await resolve(r,interpretation(r.id));
  assert.equal(out.record.ledgerState,'READY_FOR_LEDGER');
- const intent=buildImportedLedgerIntent({resolved:out.record,source:r});
+ const intent=buildImportedLedgerIntent({resolved:out.record,source:r,sourceRecordId:'evidence-'+r.id});
  assert.equal(intent.kind,'PURCHASE');if(intent.kind!=='PURCHASE')return;
  assert.equal(intent.payer,null);assert.equal(intent.funding,'OWN');assert.equal(intent.categoryId,undefined);
  const commands=interpret(intent,out.ledger);
@@ -30,14 +30,14 @@ test('ready purchase with unknown account creates unresolved movement rather tha
 
 test('ordinary external transfer remains zero consumption in ledger intent',async()=>{
  const r=record('transfer'),i={...interpretation(r.id,'EXTERNAL_TRANSFER'),channelRaw:r.facts.channelRaw};
- const out=await resolve(r,i),intent=buildImportedLedgerIntent({resolved:out.record,source:r});
+ const out=await resolve(r,i),intent=buildImportedLedgerIntent({resolved:out.record,source:r,sourceRecordId:'evidence-'+r.id});
  assert.equal(intent.kind,'EXTERNAL_TRANSFER');if(intent.kind!=='EXTERNAL_TRANSFER')return;
  assert.equal(intent.consumptionAmount,0);
 });
 
 test('import identity generates stable transaction id and immutable source evidence id',async()=>{
- const r=record('stable-source'),out=await resolve(r,interpretation(r.id)),intent=buildImportedLedgerIntent({resolved:out.record,source:r});
- assert.equal(intent.id,importedTransactionId(r));assert.equal(intent.source?.id,'source-stable-source');
+ const r=record('stable-source'),out=await resolve(r,interpretation(r.id)),intent=buildImportedLedgerIntent({resolved:out.record,source:r,sourceRecordId:'evidence-'+r.id});
+ assert.equal(intent.id,importedTransactionId(r));assert.equal(intent.source?.id,'evidence-stable-source');
  const payload=JSON.parse(intent.source!.rawPayload);assert.equal(payload.identity,'stable-source');assert.equal(payload.version,3);
 });
 
@@ -45,5 +45,5 @@ test('withdrawal with unknown fee never reaches ledger-intent builder as ready',
  const r=record('withdrawal');r.facts.feeFen=null;
  const out=await resolve(r,{...interpretation(r.id,'WITHDRAWAL'),channelRaw:r.facts.channelRaw});
  assert.equal(out.record.ledgerState,'NEEDS_ATTENTION');assert.equal(out.record.attention.some(x=>x.kind==='AMOUNT'&&x.blocking),true);
- assert.throws(()=>buildImportedLedgerIntent({resolved:out.record,source:r}),/IMPORT_NOT_READY_FOR_LEDGER/);
+ assert.throws(()=>buildImportedLedgerIntent({resolved:out.record,source:r,sourceRecordId:'evidence-'+r.id}),/IMPORT_NOT_READY_FOR_LEDGER/);
 });
