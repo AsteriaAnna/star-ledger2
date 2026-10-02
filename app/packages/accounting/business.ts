@@ -211,12 +211,13 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
    opening_balance:c.openingBalance??0,opening_balance_at:c.openingBalanceAt,last4:c.last4??'',deleted_at:null}})];
  }
  if(c.kind==='SET_BALANCE_ANCHOR') {
-  identifier(c.id);identifier(c.accountId);timestamp(c.observedAt);timestamp(c.createdAt);money(c.observedBalance,true);
+  identifier(c.accountId);timestamp(c.observedAt);timestamp(c.createdAt);money(c.observedBalance,true);
   if(!['MANUAL','STATEMENT'].includes(c.sourceType))throw Error('INVALID_ANCHOR_SOURCE');
   const a=account(c.accountId);if(!a)throw Error('ACCOUNT_UNAVAILABLE');
   if(a.fields.balance_tracking==='DISABLED')throw Error('BALANCE_TRACKING_DISABLED');
   if(Date.parse(c.observedAt)<Date.parse(String(a.fields.opening_balance_at)))throw Error('ANCHOR_BEFORE_OPENING');
-  return [create({type:'balance_anchors',id:c.id,fields:{account_id:c.accountId,observed_balance:c.observedBalance,observed_at:c.observedAt,source_type:c.sourceType,created_at:c.createdAt,deleted_at:null}})];
+  const id=`balance-anchor:${c.accountId}:${c.sourceType}:${c.observedAt}`;
+  return [create({type:'balance_anchors',id,fields:{account_id:c.accountId,observed_balance:c.observedBalance,observed_at:c.observedAt,source_type:c.sourceType,created_at:c.createdAt,deleted_at:null}})];
  }
  if(c.kind==='DELETE_TRANSACTION') {
   timestamp(c.deletedAt);const original=get('transactions',c.transactionId);
