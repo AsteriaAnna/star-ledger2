@@ -4,7 +4,7 @@ import {BusinessAccountingService,correctionSnapshot} from '../packages/accounti
 import {planTransactionCorrection} from '../packages/application/correction-service.ts';
 import {accountBalance,accountLedger,consumptionInPeriod,reconcileAccount} from '../packages/analytics/index.ts';
 import {project} from '../packages/sync/projection.ts';
-import {pair} from './helpers.ts';
+import {pair,converge} from './helpers.ts';
 
 const opening='2026-09-01T00:00:00Z',purchaseAt='2026-09-10T10:00:00Z',anchorAt='2026-09-15T12:00:00Z',later='2026-09-20T10:00:00Z',end='2026-10-01T00:00:00Z';
 function setup(t:Parameters<typeof pair>[0]){
@@ -63,4 +63,16 @@ test('an anchor can establish an account whose initial balance was unknown',t=>{
  let snap=project(p.a.store.allOperations());assert.equal(accountBalance(snap,'unknown',anchorAt).state,'UNINITIALIZED');
  service.execute({kind:'SET_BALANCE_ANCHOR',accountId:'unknown',observedBalance:43210,observedAt:anchorAt,sourceType:'MANUAL',createdAt:anchorAt});
  snap=project(p.a.store.allOperations());assert.equal(accountBalance(snap,'unknown',end).balance,43210);
+});
+
+
+test('same anchor fact edited concurrently becomes an explicit sync conflict',t=>{
+ const p=pair(t),a=new BusinessAccountingService(p.a.store,'a');
+ a.execute({kind:'CREATE_ACCOUNT',id:'bank',name:'bank',accountType:'ASSET',openingBalance:100000,openingBalanceAt:opening});converge(p.a,p.b);
+ const b=new BusinessAccountingService(p.b.store,'b');
+ a.execute({kind:'SET_BALANCE_ANCHOR',accountId:'bank',observedBalance:90000,observedAt:anchorAt,sourceType:'MANUAL',createdAt:anchorAt});
+ b.execute({kind:'SET_BALANCE_ANCHOR',accountId:'bank',observedBalance:91000,observedAt:anchorAt,sourceType:'MANUAL',createdAt:anchorAt});
+ converge(p.a,p.b);const snap=project(p.a.store.allOperations());
+ assert.ok(snap.conflicts.some(x=>x.entity_type==='balance_anchors'&&x.field==='observed_balance'));
+ assert.throws(()=>accountBalance(snap,'bank',end),/UNRESOLVED_CONFLICT/);
 });
