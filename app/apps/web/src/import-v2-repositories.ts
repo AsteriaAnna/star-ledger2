@@ -11,6 +11,7 @@ const workspace=(value:ImportWorkspaceSnapshot|undefined)=>structuredClone(value
 
 export class WebImportWorkspaceRepository implements ImportWorkspaceRepository {
  async getSession(id:string){const state=await read();return structuredClone(state.importWorkspace?.sessions[id]??null);}
+ async listSessions(){const state=await read();return structuredClone(Object.values(state.importWorkspace?.sessions??{}).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)||a.id.localeCompare(b.id)));}
  async putSession(session:ImportSession){await mutate(store=>{const next=workspace(store.state.importWorkspace);next.sessions[session.id]=structuredClone(session);store.state.importWorkspace=next;});}
  async listExternalRecords(sessionId:string){const state=await read();return structuredClone(state.importWorkspace?.records[sessionId]??[]);}
  async putExternalRecords(records:ExternalRecord[]){await mutate(store=>{
