@@ -169,8 +169,7 @@ export class ImportStatementService {
   }
 
   const session=summarizeSession({...input.prepared.session,updatedAt:input.now},allAttention,input.now);
-  await this.workspace.replaceAttentionItems(session.id,allAttention);
-  await this.workspace.putSession(session);
+  await this.workspace.saveSessionSnapshot(session,input.records,allAttention);
   return {session,records:resolved};
  }
  async prepare(input:PrepareImportInput):Promise<PrepareImportResult>{
@@ -186,7 +185,6 @@ export class ImportStatementService {
   };
   if(base.sourceType!==input.sourceType||base.sourceSystem!==input.sourceSystem)throw Error('IMPORT_SESSION_SOURCE_MISMATCH');
 
-  await this.workspace.putExternalRecords(input.records);
   const prepared:PreparedImportRecord[]=[];
   const allAttention:AttentionItem[]=[];
   let skippedDuplicateCount=0,noEffectCount=0;
@@ -231,8 +229,7 @@ export class ImportStatementService {
   }
 
   const session=summarizeSession({...base,sourceCount:input.records.length,skippedDuplicateCount,noEffectCount,updatedAt:input.now},allAttention,input.now);
-  await this.workspace.replaceAttentionItems(input.sessionId,allAttention);
-  await this.workspace.putSession(session);
+  await this.workspace.saveSessionSnapshot(session,input.records,allAttention);
   return {session,records:prepared};
  }
 }
