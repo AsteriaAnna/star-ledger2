@@ -264,6 +264,15 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
   if(status==='SUCCESS'&&amount!==0)commands.push(create({type:'balance_movements',id:`${c.id}:movement:${movementIndex++}`,
    fields:{transaction_id:c.id,account_id:id,amount,created_at:c.occurredAt}}));
  };
+ const allocations=(values:{accountId:AccountRef;amount:number}[]|undefined,total:number,flowSign:1|-1)=>{
+  if(!values?.length)return false;
+  if(values.some(value=>{money(value.amount);return false;}))throw Error('INVALID_ALLOCATION');
+  if(sum(values.map(value=>value.amount))!==total)throw Error('ALLOCATION_SUM_MISMATCH');
+  const known=values.map(value=>value.accountId).filter((value):value is string=>value!==null);
+  if(new Set(known).size!==known.length)throw Error('DUPLICATE_ALLOCATION_ACCOUNT');
+  for(const value of values)movement(value.accountId,flowSign*value.amount);
+  return true;
+ };
  const effect=(amount:number,categoryId:string|null)=>{
   if(status==='SUCCESS')commands.push(create({type:'consumption_effects',id:`${c.id}:effect`,fields:{transaction_id:c.id,
    amount,category_id:categoryId,subcategory_id:null,effective_at:c.occurredAt,created_at:c.occurredAt}}));
@@ -272,7 +281,8 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
  switch(c.kind) {
   case 'PURCHASE':
    if(c.funding&&c.funding!=='OWN'&&c.funding!=='EXTERNAL_SPONSOR')throw Error('INVALID_FUNDING');
-   if(c.funding==='EXTERNAL_SPONSOR') {if(c.payer!==null)throw Error('SPONSOR_HAS_OWN_ACCOUNT');}
+   if(c.funding==='EXTERNAL_SPONSOR') {if(c.payer!==null||c.payerAllocations?.length)throw Error('SPONSOR_HAS_OWN_ACCOUNT');}
+   else if(c.payerAllocations?.length){if(c.payer!==null)throw Error('AMBIGUOUS_FUNDING_INPUT');allocations(c.payerAllocations,c.amount,-1);}
    else movement(c.payer,-c.amount);
    effect(c.amount,c.categoryId??null);break;
   case 'INCOME':case 'TRANSFER_IN':movement(c.destination,c.amount);break;
@@ -295,7 +305,8 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
    movement(c.from,-c.amount);effect(c.consumptionAmount??0,c.categoryId??null);break;
   case 'REFUND':case 'RETURN': {
    if(!c.originalId){
-    if(c.funding==='EXTERNAL_SPONSOR'){if(c.destination!==null)throw Error('SPONSORED_REFUND_HAS_OWN_ACCOUNT');}
+    if(c.funding==='EXTERNAL_SPONSOR'){if(c.destination!==null||c.destinationAllocations?.length)throw Error('SPONSORED_REFUND_HAS_OWN_ACCOUNT');}
+    else if(c.destinationAllocations?.length){if(c.destination!==null)throw Error('AMBIGUOUS_FUNDING_INPUT');allocations(c.destinationAllocations,c.amount,1);}
     else movement(c.destination,c.amount);
     effect(c.kind==='REFUND'?-c.amount:0,c.categoryId||'待关联退款');
     break;
@@ -317,7 +328,8 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
    if(allocation.state==='NEEDS_ALLOCATION')throw Error('CONSUMPTION_ALLOCATION_REQUIRED');
    const reduction=allocation.reduction;
    const originalMovements=entities.filter(e=>e.type==='balance_movements'&&e.fields.amount!==0&&e.fields.transaction_id===c.originalId);
-   if(originalMovements.length===0) {if(c.destination!==null)throw Error('SPONSORED_REFUND_HAS_OWN_ACCOUNT');}
+   if(originalMovements.length===0) {if(c.destination!==null||c.destinationAllocations?.length)throw Error('SPONSORED_REFUND_HAS_OWN_ACCOUNT');}
+   else if(c.destinationAllocations?.length){if(c.destination!==null)throw Error('AMBIGUOUS_FUNDING_INPUT');allocations(c.destinationAllocations,c.amount,1);}
    else movement(c.destination,c.amount);
    effect(-reduction,(originalEffect?.fields.category_id as string|null)??null);
    commands.push(create({type:'transaction_links',id:`${c.id}:link`,fields:{from_transaction_id:c.id,to_transaction_id:c.originalId,type:c.kind==='REFUND'?'REFUND_OF':'RETURN_OF',deleted_at:null}}));
