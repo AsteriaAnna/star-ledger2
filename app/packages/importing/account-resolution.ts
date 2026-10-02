@@ -4,6 +4,7 @@ import {channelKey,describeFundingChannel,emptyChannel,needsSplitFunding} from '
 export type AccountRole='ACCOUNT'|'TARGET';
 export type AccountResolutionRequest={
  eventKind:string;
+ sourceSystem:string;
  platform:string;
  profile:string;
  channelRaw:string;
@@ -36,7 +37,7 @@ export function resolveAccount(request:AccountResolutionRequest,entities:Entity[
 
  const descriptor=describeFundingChannel(request.platform,request.channelRaw);
  const normalized=channelKey(request.channelRaw);
- const memoryKey={sourceSystem:request.platform,profile:request.profile,channelKey:descriptor?.identity||normalized,role:request.role};
+ const memoryKey={sourceSystem:request.sourceSystem,profile:request.profile,channelKey:descriptor?.identity||normalized,role:request.role};
  const accounts=entities.filter(e=>allowed(request,e));
 
  const candidates=accounts.filter(account=>{
