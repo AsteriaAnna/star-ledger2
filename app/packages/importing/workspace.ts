@@ -13,6 +13,7 @@ export class InMemoryImportWorkspace implements ImportWorkspaceRepository {
   this.data={sessions:structuredClone(seed?.sessions??{}),records:structuredClone(seed?.records??{}),attention:structuredClone(seed?.attention??{})};
  }
  async getSession(id:string){return structuredClone(this.data.sessions[id]??null);}
+ async listSessions(){return structuredClone(Object.values(this.data.sessions).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)||a.id.localeCompare(b.id)));}
  async putSession(session:ImportSession){this.data.sessions[session.id]=structuredClone(session);}
  async listExternalRecords(sessionId:string){return structuredClone(this.data.records[sessionId]??[]);}
  async putExternalRecords(records:ExternalRecord[]){
@@ -59,6 +60,7 @@ export class LocalImportWorkspace implements ImportWorkspaceRepository {
  }
  private persist(){this.storage.setItem(this.key,JSON.stringify(this.memory.snapshot()));}
  async getSession(id:string){return this.memory.getSession(id);}
+ async listSessions(){return this.memory.listSessions();}
  async putSession(session:ImportSession){await this.memory.putSession(session);this.persist();}
  async listExternalRecords(sessionId:string){return this.memory.listExternalRecords(sessionId);}
  async putExternalRecords(records:ExternalRecord[]){await this.memory.putExternalRecords(records);this.persist();}
