@@ -55,3 +55,12 @@ test('same raw source identity in different profiles cannot collide',async()=>{
  const ia=buildImportedLedgerIntent({resolved:a.record,source:mine}),ib=buildImportedLedgerIntent({resolved:b.record,source:other});
  assert.notEqual(ia.id,ib.id);assert.notEqual(ia.source?.id,ib.source?.id);
 });
+
+
+test('recognized repayment reaches ledger with unresolved liability endpoint instead of blocking import',async()=>{
+ const r=record('repayment'),i={...interpretation(r.id,'REPAYMENT'),channelRaw:r.facts.channelRaw};
+ const out=await resolve(r,i);
+ assert.equal(out.record.ledgerState,'READY_FOR_LEDGER');assert.equal(out.record.attention.some(x=>x.kind==='TRANSFER_ENDPOINTS'&&x.blocking),false);
+ const intent=buildImportedLedgerIntent({resolved:out.record,source:r});assert.equal(intent.kind,'REPAYMENT');
+ if(intent.kind==='REPAYMENT'){assert.equal(intent.to,null);}
+});
