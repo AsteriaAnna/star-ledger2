@@ -66,7 +66,7 @@ test('an anchor can establish an account whose initial balance was unknown',t=>{
 });
 
 
-test('same anchor fact edited concurrently becomes an explicit sync conflict',t=>{
+test('concurrent balance observations stay distinct and reconciliation reports ambiguity',t=>{
  const p=pair(t),a=new BusinessAccountingService(p.a.store,'a');
  a.execute({kind:'CREATE_ACCOUNT',id:'bank',name:'bank',accountType:'ASSET',openingBalance:100000,openingBalanceAt:opening});converge(p.a,p.b);
  const b=new BusinessAccountingService(p.b.store,'b');
