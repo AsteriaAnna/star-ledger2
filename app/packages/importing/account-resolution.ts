@@ -37,7 +37,8 @@ export function resolveAccount(request:AccountResolutionRequest,entities:Entity[
 
  const descriptor=describeFundingChannel(request.platform,request.channelRaw);
  const normalized=channelKey(request.channelRaw);
- const memoryKey={sourceSystem:request.sourceSystem,profile:request.profile,channelKey:descriptor?.identity||normalized,role:request.role};
+ const memoryRole=request.role==='ACCOUNT'?'PRIMARY':request.eventKind==='REPAYMENT'?'REPAYMENT_TARGET':'TRANSFER_TARGET';
+ const memoryKey={sourceSystem:request.sourceSystem,profile:request.profile,channelKey:descriptor?.identity||normalized,role:memoryRole};
  const accounts=entities.filter(e=>allowed(request,e));
 
  const candidates=accounts.filter(account=>{
