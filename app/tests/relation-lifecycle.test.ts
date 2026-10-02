@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {BusinessAccountingService} from '../packages/accounting/business.ts';
 import {accountBalance,consumptionInPeriod} from '../packages/analytics/index.ts';
 import {project} from '../packages/sync/projection.ts';
+import type {Operation} from '../packages/domain/index.ts';
 import {pair,converge} from './helpers.ts';
 
 const start='2026-09-01T00:00:00Z',purchaseAt='2026-09-10T10:00:00Z',refundAt='2026-09-20T10:00:00Z',end='2026-10-01T00:00:00Z';
@@ -57,4 +58,11 @@ test('detach lifecycle converges across devices',t=>{
  converge(x.a,x.b);
  const a=project(x.a.store.allOperations()),b=project(x.b.store.allOperations());assert.deepEqual(a.entities,b.entities);assert.deepEqual(a.conflicts,b.conflicts);
  assert.equal(a.entities.find(e=>e.type==='transaction_links'&&e.id==='refund:link')?.fields.deleted_at,'2026-09-21T00:00:00Z');
+});
+
+
+test('legacy link operations without deleted_at project as active',()=>{
+ const op={id:'old:1',device:'old',seq:1,command_id:'old:1',command_index:0,command_size:1,parents:[],action:'CREATE_ENTITY',entity:{type:'transaction_links',id:'legacy-link',fields:{from_transaction_id:'refund',to_transaction_id:'buy',type:'REFUND_OF'}}} as Operation;
+ const link=project([op]).entities.find(e=>e.type==='transaction_links'&&e.id==='legacy-link');
+ assert.equal(link?.fields.deleted_at,null);
 });
