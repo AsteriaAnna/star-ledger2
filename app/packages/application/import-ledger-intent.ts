@@ -8,7 +8,9 @@ export type LedgerIntentBuildInput={
  sourceRecordId:string;
 };
 
-export const importedTransactionId=(source:ExternalRecord)=>'import-'+source.sourceIdentity;
+export const sourceIdentityNamespace=(source:ExternalRecord)=>[source.sourceSystem,source.platformRaw,source.profile,source.sourceIdentity].map(value=>encodeURIComponent(value)).join(':');
+export const importedTransactionId=(source:ExternalRecord)=>'import-v2:'+sourceIdentityNamespace(source);
+export const importedSourceRecordId=(source:ExternalRecord)=>'source-v2:'+sourceIdentityNamespace(source);
 
 export function importSourcePayload(source:ExternalRecord){
  return JSON.stringify({
@@ -28,7 +30,6 @@ export function importSourcePayload(source:ExternalRecord){
 
 export function buildImportedLedgerIntent(input:LedgerIntentBuildInput):LedgerIntent{
  const {resolved,source}=input,interpretation=resolved.interpretation;
- if(!input.sourceRecordId.trim())throw Error('INVALID_SOURCE_RECORD_ID');
  if(resolved.ledgerState!=='READY_FOR_LEDGER'||resolved.disposition!=='INTERPRETED')throw Error('IMPORT_NOT_READY_FOR_LEDGER');
  if(interpretation.amountFen===null||!Number.isSafeInteger(interpretation.amountFen)||interpretation.amountFen<=0)throw Error('INVALID_MONEY');
  if(!interpretation.occurredAt||!Number.isFinite(Date.parse(interpretation.occurredAt)))throw Error('INVALID_TIMESTAMP');
@@ -36,7 +37,7 @@ export function buildImportedLedgerIntent(input:LedgerIntentBuildInput):LedgerIn
  if(interpretation.eventKind==='UNKNOWN')throw Error('IMPORT_EVENT_NOT_POSTABLE');
 
  const id=importedTransactionId(source);
- const sourceEvidence:SourceEvidence={id:input.sourceRecordId,sourceType:source.sourceType,platform:source.platformRaw,rawPayload:importSourcePayload(source)};
+ const sourceEvidence:SourceEvidence={id:importedSourceRecordId(source),sourceType:source.sourceType,platform:source.platformRaw,rawPayload:importSourcePayload(source)};
  const base={id,occurredAt:interpretation.occurredAt,name:interpretation.displayName.trim()||source.facts.counterpartyRaw||source.facts.productRaw||source.facts.transactionTypeRaw||'账单记录',amount:interpretation.amountFen,status:interpretation.status,note:source.facts.noteRaw||source.facts.productRaw||'',source:sourceEvidence};
  const account=resolved.account?.state==='RESOLVED'?resolved.account.accountId:null;
  const sourceSponsored=/亲情卡|亲属卡/.test(source.facts.channelRaw);
