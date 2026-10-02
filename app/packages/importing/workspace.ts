@@ -25,6 +25,9 @@ export class InMemoryImportWorkspace implements ImportWorkspaceRepository {
  }
  async listAttentionItems(sessionId:string){return structuredClone(this.data.attention[sessionId]??[]);}
  async replaceAttentionItems(sessionId:string,items:AttentionItem[]){this.data.attention[sessionId]=structuredClone(items);}
+ async saveSessionSnapshot(session:ImportSession,records:ExternalRecord[],items:AttentionItem[]){
+  const next=structuredClone(this.data);next.sessions[session.id]=structuredClone(session);next.records[session.id]=structuredClone(records);next.attention[session.id]=structuredClone(items);this.data=next;
+ }
  async clearSession(id:string){delete this.data.sessions[id];delete this.data.records[id];delete this.data.attention[id];}
  snapshot(){return structuredClone(this.data);}
 }
