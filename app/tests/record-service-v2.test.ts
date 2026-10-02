@@ -38,3 +38,12 @@ test('manual record rejects contradictory sponsor/account input before domain co
  assert.throws(()=>buildManualLedgerIntent({action:'SPEND',transactionId:'x',amount:1000,payer:'bank',funding:'EXTERNAL_SPONSOR'},now),/SPONSOR_HAS_OWN_ACCOUNT/);
  assert.throws(()=>buildManualLedgerIntent({action:'RECEIVE',meaning:'REFUND',transactionId:'r',amount:1000,destination:'bank',funding:'EXTERNAL_SPONSOR'},now),/SPONSORED_REFUND_HAS_OWN_ACCOUNT/);
 });
+
+
+test('manual spend can pass through explicit split funding without inventing a primary payer',()=>{
+ const intent=buildManualLedgerIntent({action:'SPEND',transactionId:'split',amount:10000,payer:null,payerAllocations:[{accountId:'bank',amount:7000},{accountId:'wallet',amount:3000}],categoryId:'餐饮'},now);
+ assert.equal(intent.kind,'PURCHASE');if(intent.kind!=='PURCHASE')return;
+ assert.equal(intent.payer,null);assert.deepEqual(intent.payerAllocations,[{accountId:'bank',amount:7000},{accountId:'wallet',amount:3000}]);
+ const commands=interpret(intent,ledger),moves=commands.filter(x=>x.entity.type==='balance_movements');
+ assert.deepEqual(moves.map(x=>[x.entity.fields.account_id,x.entity.fields.amount]),[['bank',-7000],['wallet',-3000]]);
+});
