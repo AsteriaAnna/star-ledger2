@@ -15,7 +15,7 @@ export function validateImportWorkspace(value:unknown):ImportWorkspaceSnapshot{
  if(!value||typeof value!=='object')throw Error('备份导入恢复状态格式无效');
  const v=value as any;if(!v.sessions||!v.records||!v.attention||typeof v.sessions!=='object'||typeof v.records!=='object'||typeof v.attention!=='object')throw Error('备份导入恢复状态格式无效');
  const sessions=Object.values(v.sessions) as any[];if(sessions.length>1000)throw Error('备份导入恢复状态过大');
- for(const s of sessions)if(!s||typeof s.id!=='string'||typeof s.updatedAt!=='string'||!['PARSING','RESOLVING','NEEDS_ATTENTION','READY','COMPLETED','FAILED'].includes(s.state))throw Error('备份导入恢复状态格式无效');
+ for(const s of sessions)if(!s||typeof s.id!=='string'||typeof s.updatedAt!=='string'||!['PROCESSING','NEEDS_ATTENTION','COMPLETED','FAILED','ROLLED_BACK'].includes(s.state))throw Error('备份导入恢复状态格式无效');
  const ids=new Set(sessions.map(s=>s.id));let count=0;
  for(const [id,records] of Object.entries(v.records) as [string,any[]][]){if(!ids.has(id)||!Array.isArray(records)||(count+=records.length)>20000||records.some(r=>!r||r.sessionId!==id||typeof r.id!=='string'||typeof r.rawPayload!=='string'))throw Error('备份导入恢复状态格式无效');}
  for(const [id,items] of Object.entries(v.attention) as [string,any[]][]){if(!ids.has(id)||!Array.isArray(items)||items.some(a=>!a||a.sessionId!==id||typeof a.id!=='string'||typeof a.question!=='string'))throw Error('备份导入恢复状态格式无效');}
