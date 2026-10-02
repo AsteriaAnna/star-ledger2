@@ -20,7 +20,7 @@ export const fields:Record<EntityType,Record<string,'string'|'money'|'nullable'>
  source_records:{transaction_id:'string',source_type:'string',platform:'string',raw_payload:'string',created_at:'string'},
  balance_movements:{transaction_id:'string',account_id:'nullable',amount:'money',created_at:'string'},
  consumption_effects:{transaction_id:'string',amount:'money',category_id:'nullable',subcategory_id:'nullable',effective_at:'string',created_at:'string'},
- transaction_links:{from_transaction_id:'string',to_transaction_id:'string',type:'string'}
+ transaction_links:{from_transaction_id:'string',to_transaction_id:'string',type:'string',deleted_at:'nullable'}
 };
 export function validate(op:Operation):void {
  if(!op || !/^[\w-]+$/.test(op.device) || !Number.isSafeInteger(op.seq) || op.seq<1 || op.id!==`${op.device}:${op.seq}`) throw Error('INVALID_OPERATION');
@@ -33,7 +33,7 @@ export function validate(op:Operation):void {
   if(!Object.hasOwn(spec,k)) throw Error('INVALID_FIELD');
   if(spec[k]==='money' ? !Number.isSafeInteger(v) : spec[k]==='string' ? typeof v!=='string' : !(v===null||typeof v==='string')) throw Error('INVALID_VALUE');
  }
- if(op.action==='CREATE_ENTITY' && Object.keys(spec).some(k=>!(e.type==='transactions'&&(k==='posting_plan'||k==='purged_at'))&&!Object.hasOwn(e.fields,k))) throw Error('MISSING_FIELD');
+ if(op.action==='CREATE_ENTITY' && Object.keys(spec).some(k=>!(e.type==='transactions'&&(k==='posting_plan'||k==='purged_at'))&&!(e.type==='transaction_links'&&k==='deleted_at')&&!Object.hasOwn(e.fields,k))) throw Error('MISSING_FIELD');
  if(op.action==='DELETE_ENTITY' && (Object.keys(e.fields).length!==1||typeof e.fields.deleted_at!=='string')) throw Error('INVALID_DELETE');
  if(op.action==='PATCH_FIELD' && (Object.keys(e.fields).length!==1||Object.hasOwn(e.fields,'deleted_at'))) throw Error('INVALID_PATCH');
  if(op.action==='RESOLVE_CONFLICT' && !Object.keys(e.fields).length) throw Error('EMPTY_RESOLUTION');
