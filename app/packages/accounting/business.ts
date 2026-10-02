@@ -185,6 +185,11 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
   if(c.kind==='BIND_ACCOUNT')assertClear('transactions',parent.id);
   else if(!bindingConflicts.length||bindingConflicts.some(x=>!['account_id','amount'].includes(x.field))||snapshot.conflicts.some(x=>x.entity_type==='transactions'&&x.entity_id===parent.id))throw Error('NO_RESOLVABLE_BINDING');
   const target=account(c.accountId)!;
+  if(parent.fields.event_type==='REPAYMENT') {
+   const flow=(m.fields.amount as number)*((m.fields.account_id!==null&&account(m.fields.account_id as string)?.fields.type==='LIABILITY')?-1:1);
+   if(flow<0&&target.fields.type!=='ASSET')throw Error('REPAYMENT_SOURCE_REQUIRES_ASSET');
+   if(flow>0&&target.fields.type!=='LIABILITY')throw Error('REPAYMENT_TARGET_REQUIRES_LIABILITY');
+  }
   if(['INTERNAL_TRANSFER','WITHDRAWAL'].includes(parent.fields.event_type as string)) {
    if(target.fields.type!=='ASSET')throw Error('TRANSFER_REQUIRES_ASSET');
    if(entities.some(e=>e.type==='balance_movements'&&e.id!==m.id&&e.fields.transaction_id===parent.id&&e.fields.account_id===c.accountId))throw Error('SAME_ACCOUNT_TRANSFER');
@@ -281,7 +286,8 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
    movement(c.from,-sum([c.amount,c.fee]));movement(c.to,c.amount);
    if(c.fee)effect(c.fee,'fees');break;
   case 'REPAYMENT':
-   if(account(c.from)?.fields.type!=='ASSET'||account(c.to)?.fields.type!=='LIABILITY')throw Error('INVALID_REPAYMENT_ACCOUNTS');
+   if(c.from!==null&&account(c.from)?.fields.type!=='ASSET')throw Error('INVALID_REPAYMENT_ACCOUNTS');
+   if(c.to!==null&&account(c.to)?.fields.type!=='LIABILITY')throw Error('INVALID_REPAYMENT_ACCOUNTS');
    movement(c.from,-c.amount);movement(c.to,c.amount);break;
   case 'EXTERNAL_TRANSFER':case 'DEPOSIT':case 'RED_PACKET':
    money(c.consumptionAmount??0,true);
