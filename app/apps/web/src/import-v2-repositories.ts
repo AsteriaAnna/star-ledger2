@@ -7,7 +7,7 @@ import {mutate,read} from './store.ts';
 import {project} from '../../../packages/sync/projection.ts';
 
 const empty=():ImportWorkspaceSnapshot=>({sessions:{},records:{},attention:{},outcomes:{}});
-const workspace=(value:ImportWorkspaceSnapshot|undefined)=>structuredClone(value??empty());
+const workspace=(value:ImportWorkspaceSnapshot|undefined)=>{const next=structuredClone(value??empty()) as ImportWorkspaceSnapshot;next.outcomes??={};return next;};
 
 export class WebImportWorkspaceRepository implements ImportWorkspaceRepository {
  async getSession(id:string){const state=await read();return structuredClone(state.importWorkspace?.sessions[id]??null);}
