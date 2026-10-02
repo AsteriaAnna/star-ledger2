@@ -35,6 +35,6 @@ test('invalid later intent prevents the whole import accounting batch from parti
 test('purged transaction cannot be revived by reimport',t=>{
  const p=pair(t),service=new BusinessAccountingService(p.a.store,'a');
  service.execute(intent('old'));service.execute({kind:'DELETE_TRANSACTION',transactionId:'old',deletedAt:'2026-10-02T11:00:00Z'});
- p.a.core.execute([{action:'PATCH_FIELD',entity:{type:'transactions',id:'old',fields:{purged_at:'2026-10-02T11:30:00Z'}}}]);
+ p.a.service.execute([{action:'PATCH_FIELD',entity:{type:'transactions',id:'old',fields:{purged_at:'2026-10-02T11:30:00Z'}}}]);
  assert.throws(()=>planImportExecution({newIntents:[],revivals:[{transactionId:'old',replacement:intent('old'),externalRecordId:'source'}],skippedDuplicateIds:[],noEffectRecordIds:[],blockedRecordIds:[],attentionRecordIds:[]},p.a.store.snapshot(),at),/TRANSACTION_UNAVAILABLE/);
 });
