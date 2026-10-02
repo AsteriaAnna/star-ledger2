@@ -16,7 +16,7 @@ export type InternalTransfer = EventBase & {kind:'INTERNAL_TRANSFER';amount:numb
 export type Withdrawal = EventBase & {kind:'WITHDRAWAL';amount:number;fee:number;from:AccountRef;to:AccountRef};
 export type ExternalPayment = EventBase & {kind:'EXTERNAL_TRANSFER'|'DEPOSIT'|'RED_PACKET';amount:number;
  from:AccountRef; consumptionAmount?:number; categoryId?:string};
-export type Repayment = EventBase & {kind:'REPAYMENT';amount:number;from:string;to:string};
+export type Repayment = EventBase & {kind:'REPAYMENT';amount:number;from:AccountRef;to:AccountRef};
 export type Refund = EventBase & {kind:'REFUND'|'RETURN';amount:number;originalId:string|null;destination:AccountRef;
  funding?:'OWN'|'EXTERNAL_SPONSOR';categoryId?:string;consumptionReduction?:number};
 export type Meaning = {kind:'SET_CONSUMPTION';transactionId:string;amount:number;categoryId:string|null};
