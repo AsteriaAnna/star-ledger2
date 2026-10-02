@@ -7,6 +7,7 @@ import {needsSplit,roleChannel} from './channels.ts';
 import {resolveRefund} from './refund-matcher.ts';
 import {sourceCategory} from './categories.ts';
 import {resolveAccount,allowedAccount} from './account-matcher.ts';
+import {findSourceMatch} from '../../../packages/importing/dedup.ts';
 export function ruleCommand(entities:Entity[],id:string,value:unknown):Command{
  const old=entities.find(e=>e.type==='import_rules'&&e.id===id);
  return old?{action:'PATCH_FIELD',entity:{type:'import_rules',id,fields:{value:value===null?null:JSON.stringify(value)}}}:{action:'CREATE_ENTITY',entity:{type:'import_rules',id,fields:{rule_key:id,value:value===null?null:JSON.stringify(value)}}};
@@ -14,12 +15,8 @@ export function ruleCommand(entities:Entity[],id:string,value:unknown):Command{
 export function ruleValue(entities:Entity[],id:string):any{const e=entities.find(e=>e.type==='import_rules'&&e.id===id);try{return e?.fields.value?JSON.parse(String(e.fields.value)):undefined;}catch{return undefined;}}
 export function sourcePayload(d:Draft){return {version:2,identity:d.identity||d.key,profile:d.profile||'本人',key:d.key,order:d.order,originalOrder:d.originalOrder,sourceClass:d.sourceClass,channel:d.channel,original:d.raw,parserVersion:3,timezone:'Asia/Shanghai',precision:d.precision};}
 export function existingSource(d:Draft,entities:Entity[]){
- const linked=ruleValue(entities,'source-'+(d.identity||d.key));const ids=new Set<string>();if(linked?.transactionId)ids.add(linked.transactionId);
- for(const s of entities.filter(e=>e.type==='source_records')){
-  let p:any;try{p=JSON.parse(String(s.fields.raw_payload));}catch{continue;}
-  // Legacy records lack profile and stable event identity: block unsafe re-import, do not rewrite.
-  if(p.identity===(d.identity||d.key)||s.id==='source-'+d.key||d.order&&p.order===d.order&&s.fields.platform===d.platform&&(!p.profile||p.profile===d.profile))ids.add(String(s.fields.transaction_id));
- }
+ const match=findSourceMatch({value:d.identity||d.key,platform:d.platform,profile:d.profile||'本人',orderId:d.order||null},entities);
+ const ids=new Set(match.transactionIds);
  return entities.filter(e=>e.type==='transactions'&&ids.has(e.id)&&!e.fields.purged_at);
 }
 export function identicalInterpretation(d:Draft,t:Entity,entities:Entity[]=[]){try{
