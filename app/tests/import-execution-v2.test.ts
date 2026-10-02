@@ -54,3 +54,16 @@ test('execution outcomes preserve external record identity instead of inferring 
  const outcomes=importRecordOutcomes('s',execution,at);
  assert.deepEqual(outcomes.map(x=>[x.externalRecordId,x.state]).sort(),[['source-a','COMMITTED'],['source-blocked','BLOCKED'],['source-dup','SKIPPED_DUPLICATE'],['source-failed','NO_EFFECT'],['source-old','COMMITTED']].sort());
 });
+
+
+test('changed source evidence appends immutably without changing accounting facts',t=>{
+ const p=pair(t),service=new BusinessAccountingService(p.a.store,'a');
+ service.execute({...intent('existing'),source:{id:'old-evidence',sourceType:'EXCEL',platform:'微信',rawPayload:'old',capturedAt:at}});
+ const before=p.a.store.get('transactions','existing')?.fields.display_amount;
+ const source={id:'new-evidence',sourceType:'EXCEL' as const,platform:'微信',rawPayload:'new',capturedAt:'2026-10-02T12:00:00Z'};
+ const execution=planImportExecution({evidenceUpdates:[{externalRecordId:'row',transactionId:'existing',source}],newRecords:[],revivals:[],skippedDuplicateIds:[],noEffectRecordIds:[],blockedRecordIds:['row'],attentionRecordIds:['row']},project(p.a.store.allOperations()),'2026-10-02T12:00:00Z');
+ service.executeBatch(execution.commands);
+ assert.equal(p.a.store.get('transactions','existing')?.fields.display_amount,before);
+ assert.equal(p.a.store.get('source_records','old-evidence')?.fields.raw_payload,'old');
+ assert.equal(p.a.store.get('source_records','new-evidence')?.fields.raw_payload,'new');
+});
