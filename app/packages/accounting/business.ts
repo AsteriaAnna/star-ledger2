@@ -223,6 +223,11 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
   if(Date.parse(c.observedAt)<Date.parse(String(a.fields.opening_balance_at)))throw Error('ANCHOR_BEFORE_OPENING');
   return [create({type:'balance_anchors',id:c.observationId,fields:{account_id:c.accountId,observed_balance:c.observedBalance,observed_at:c.observedAt,source_type:c.sourceType,created_at:c.createdAt,deleted_at:null}})];
  }
+ if(c.kind==='RESTORE_TRANSACTION') {
+  const original=get('transactions',c.transactionId);if(!original||!original.fields.deleted_at||original.fields.purged_at)throw Error('TRANSACTION_UNAVAILABLE');
+  assertClear('transactions',c.transactionId);
+  return [{action:'PATCH_FIELD',entity:{type:'transactions',id:c.transactionId,fields:{deleted_at:null}}}];
+ }
  if(c.kind==='DELETE_TRANSACTION') {
   timestamp(c.deletedAt);const original=get('transactions',c.transactionId);
   if(!original||original.fields.deleted_at)throw Error('TRANSACTION_UNAVAILABLE');
