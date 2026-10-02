@@ -5,7 +5,6 @@ import type {ResolvedImportRecord} from './import-service.ts';
 export type LedgerIntentBuildInput={
  resolved:ResolvedImportRecord;
  source:ExternalRecord;
- sourceRecordId:string;
 };
 
 export const sourceIdentityNamespace=(source:ExternalRecord)=>[source.sourceSystem,source.platformRaw,source.profile,source.sourceIdentity].map(value=>encodeURIComponent(value)).join(':');
