@@ -266,7 +266,7 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
  };
  const allocations=(values:{accountId:AccountRef;amount:number}[]|undefined,total:number,flowSign:1|-1)=>{
   if(!values?.length)return false;
-  if(values.some(value=>{money(value.amount);return false;}))throw Error('INVALID_ALLOCATION');
+  for(const value of values)money(value.amount);
   if(sum(values.map(value=>value.amount))!==total)throw Error('ALLOCATION_SUM_MISMATCH');
   const known=values.map(value=>value.accountId).filter((value):value is string=>value!==null);
   if(new Set(known).size!==known.length)throw Error('DUPLICATE_ALLOCATION_ACCOUNT');
