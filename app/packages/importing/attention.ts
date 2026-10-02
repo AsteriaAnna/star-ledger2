@@ -10,6 +10,11 @@ export function summarizeSession(session:ImportSession,items:AttentionItem[],upd
  return {...session,updatedAt,state,blockingAttentionCount:blocking,nonBlockingAttentionCount:nonBlocking};
 }
 
+export function createAttention(input:Omit<AttentionItem,'id'>):AttentionItem{
+ const item:AttentionItem={...input,id:attentionId(input.sessionId,input.externalRecordId,input.kind)};
+ assertAttentionItem(item);return item;
+}
+
 export function assertAttentionItem(item:AttentionItem){
  if(!item.id||!item.sessionId||!item.externalRecordId||!item.question.trim())throw Error('INVALID_ATTENTION_ITEM');
  if(item.candidates.some(candidate=>!candidate.id||!candidate.label.trim()))throw Error('INVALID_ATTENTION_CANDIDATE');
