@@ -1,7 +1,7 @@
 import type {AttentionItem,ExternalRecord,ImportSession} from '../../../packages/importing/types.ts';
 import type {ImportWorkspaceSnapshot} from '../../../packages/importing/workspace.ts';
 import type {AccountIdentity,AccountMapping,CategoryMapping,ImportWorkspaceRepository,MerchantIdentity,ResolutionMemoryRepository} from '../../../packages/application/ports.ts';
-import {readAccountMapping,readMerchantCategory,rememberAccountMappingCommand,rememberMerchantCategoryCommand} from '../../../packages/importing/resolution-memory.ts';
+import {legacyAccountMemoryMigrationCommands,readAccountMapping,readMerchantCategory,rememberAccountMappingCommand,rememberMerchantCategoryCommand} from '../../../packages/importing/resolution-memory.ts';
 import {AccountingService} from '../../../packages/accounting/index.ts';
 import {mutate,read} from './store.ts';
 import {project} from '../../../packages/sync/projection.ts';
@@ -35,4 +35,12 @@ export class LedgerResolutionMemoryRepository implements ResolutionMemoryReposit
  async rememberAccountMapping(key:AccountIdentity,mapping:AccountMapping){await mutate(store=>{new AccountingService(store,store.state.device).execute([rememberAccountMappingCommand(store.entities,key,mapping)]);});}
  async findMerchantCategory(key:MerchantIdentity):Promise<CategoryMapping|null>{return readMerchantCategory(await this.entities(),key);}
  async rememberMerchantCategory(key:MerchantIdentity,mapping:CategoryMapping){await mutate(store=>{new AccountingService(store,store.state.device).execute([rememberMerchantCategoryCommand(store.entities,key,mapping)]);});}
+}
+
+
+export async function migrateLegacyResolutionMemory(now:string){
+ await mutate(store=>{
+  const commands=legacyAccountMemoryMigrationCommands(store.entities,now);
+  if(commands.length)new AccountingService(store,store.state.device).execute(commands);
+ });
 }
