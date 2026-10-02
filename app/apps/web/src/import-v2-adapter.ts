@@ -23,7 +23,7 @@ const eventKind=(kind:string):InterpretedEventKind=>{
 const amountFen=(draft:Draft)=>{try{return money(draft.amount);}catch{return null;}};
 const occurredAt=(draft:Draft)=>{try{return sourceUTC(draft.date);}catch{return null;}};
 
-export function legacyDraftToExternalRecord(draft:Draft,sessionId:string,capturedAt:string):ExternalRecord{
+export function legacyDraftToExternalRecord(draft:Draft,sessionId:string,capturedAt:string,observationId?:string):ExternalRecord{
  const row=rawObject(draft.raw);
  const facts:NormalizedSourceFacts={
   occurredAt:occurredAt(draft),
@@ -43,7 +43,7 @@ export function legacyDraftToExternalRecord(draft:Draft,sessionId:string,capture
   precision:draft.precision||'invalid'
  };
  return {
-  id:draft.itemId||draft.identity||draft.key,
+  id:observationId??draft.itemId||draft.identity||draft.key,
   sessionId,
   sourceIdentity:draft.identity||draft.key,
   sourceType:draft.sourceType,
