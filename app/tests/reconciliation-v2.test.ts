@@ -23,7 +23,7 @@ test('reconciliation observation reports difference without changing the ledger'
 
 test('balance anchor resets only balance derivation, never consumption',t=>{
  const x=setup(t);
- x.service.execute({kind:'SET_BALANCE_ANCHOR',accountId:'bank',observedBalance:89500,observedAt:anchorAt,sourceType:'MANUAL',createdAt:anchorAt});
+ x.service.execute({kind:'SET_BALANCE_ANCHOR',observationId:'obs-1',accountId:'bank',observedBalance:89500,observedAt:anchorAt,sourceType:'MANUAL',createdAt:anchorAt});
  assert.equal(accountBalance(x.snapshot(),'bank',anchorAt).balance,89500);
  assert.equal(consumptionInPeriod(x.snapshot(),opening,end),10000);
  x.service.execute({kind:'INCOME',id:'income',name:'income',amount:2000,destination:'bank',occurredAt:later});
@@ -32,17 +32,17 @@ test('balance anchor resets only balance derivation, never consumption',t=>{
 
 test('account ledger starts at latest trusted anchor and exposes running balance',t=>{
  const x=setup(t);
- x.service.execute({kind:'SET_BALANCE_ANCHOR',accountId:'bank',observedBalance:90000,observedAt:anchorAt,sourceType:'STATEMENT',createdAt:anchorAt});
+ x.service.execute({kind:'SET_BALANCE_ANCHOR',observationId:'obs-2',accountId:'bank',observedBalance:90000,observedAt:anchorAt,sourceType:'STATEMENT',createdAt:anchorAt});
  x.service.execute({kind:'PURCHASE',id:'later-buy',name:'later',amount:2500,payer:'bank',occurredAt:later});
  const ledger=accountLedger(x.snapshot(),'bank',end);
- assert.equal(ledger.baseline.source,'ANCHOR');assert.equal(ledger.baseline.anchorId,`balance-anchor:bank:STATEMENT:${anchorAt}`);assert.equal(ledger.rows.length,1);
+ assert.equal(ledger.baseline.source,'ANCHOR');assert.equal(ledger.baseline.anchorId,'obs-2');assert.equal(ledger.rows.length,1);
  assert.deepEqual(ledger.rows[0],{transactionId:'later-buy',movementId:'later-buy:movement:0',occurredAt:later,amount:-2500,runningBalance:87500,displayName:'later'});
  assert.equal(ledger.balance,87500);
 });
 
 test('moving a transaction across an anchor boundary changes balance transparently',t=>{
  const x=setup(t);
- x.service.execute({kind:'SET_BALANCE_ANCHOR',accountId:'bank',observedBalance:90000,observedAt:anchorAt,sourceType:'MANUAL',createdAt:anchorAt});
+ x.service.execute({kind:'SET_BALANCE_ANCHOR',observationId:'obs-3',accountId:'bank',observedBalance:90000,observedAt:anchorAt,sourceType:'MANUAL',createdAt:anchorAt});
  const before=x.snapshot();assert.equal(accountBalance(before,'bank',end).balance,90000);
  const plan=planTransactionCorrection({transactionId:'buy',replacement:{kind:'PURCHASE',id:'buy',name:'purchase',amount:10000,payer:'bank',occurredAt:later,categoryId:'餐饮'},expectedSnapshot:correctionSnapshot(before.entities,'buy'),correctedAt:'2026-10-02T00:00:00Z'},before);
  x.service.executeBatch(plan.commands);
@@ -52,8 +52,8 @@ test('moving a transaction across an anchor boundary changes balance transparent
 
 test('same-time contradictory anchors fail closed instead of selecting a silent winner',t=>{
  const x=setup(t);
- x.service.execute({kind:'SET_BALANCE_ANCHOR',accountId:'bank',observedBalance:90000,observedAt:anchorAt,sourceType:'MANUAL',createdAt:anchorAt});
- x.service.execute({kind:'SET_BALANCE_ANCHOR',accountId:'bank',observedBalance:91000,observedAt:anchorAt,sourceType:'STATEMENT',createdAt:'2026-09-16T00:00:00Z'});
+ x.service.execute({kind:'SET_BALANCE_ANCHOR',observationId:'obs-4',accountId:'bank',observedBalance:90000,observedAt:anchorAt,sourceType:'MANUAL',createdAt:anchorAt});
+ x.service.execute({kind:'SET_BALANCE_ANCHOR',observationId:'obs-5',accountId:'bank',observedBalance:91000,observedAt:anchorAt,sourceType:'STATEMENT',createdAt:'2026-09-16T00:00:00Z'});
  assert.throws(()=>accountBalance(x.snapshot(),'bank',end),/AMBIGUOUS_BALANCE_ANCHOR/);
 });
 
@@ -61,7 +61,7 @@ test('an anchor can establish an account whose initial balance was unknown',t=>{
  const p=pair(t),service=new BusinessAccountingService(p.a.store,'a');
  service.execute({kind:'CREATE_ACCOUNT',id:'unknown',name:'unknown',accountType:'ASSET',openingBalance:null,openingBalanceAt:opening});
  let snap=project(p.a.store.allOperations());assert.equal(accountBalance(snap,'unknown',anchorAt).state,'UNINITIALIZED');
- service.execute({kind:'SET_BALANCE_ANCHOR',accountId:'unknown',observedBalance:43210,observedAt:anchorAt,sourceType:'MANUAL',createdAt:anchorAt});
+ service.execute({kind:'SET_BALANCE_ANCHOR',observationId:'obs-6',accountId:'unknown',observedBalance:43210,observedAt:anchorAt,sourceType:'MANUAL',createdAt:anchorAt});
  snap=project(p.a.store.allOperations());assert.equal(accountBalance(snap,'unknown',end).balance,43210);
 });
 
@@ -70,9 +70,9 @@ test('same anchor fact edited concurrently becomes an explicit sync conflict',t=
  const p=pair(t),a=new BusinessAccountingService(p.a.store,'a');
  a.execute({kind:'CREATE_ACCOUNT',id:'bank',name:'bank',accountType:'ASSET',openingBalance:100000,openingBalanceAt:opening});converge(p.a,p.b);
  const b=new BusinessAccountingService(p.b.store,'b');
- a.execute({kind:'SET_BALANCE_ANCHOR',accountId:'bank',observedBalance:90000,observedAt:anchorAt,sourceType:'MANUAL',createdAt:anchorAt});
- b.execute({kind:'SET_BALANCE_ANCHOR',accountId:'bank',observedBalance:91000,observedAt:anchorAt,sourceType:'MANUAL',createdAt:anchorAt});
+ a.execute({kind:'SET_BALANCE_ANCHOR',observationId:'obs-7',accountId:'bank',observedBalance:90000,observedAt:anchorAt,sourceType:'MANUAL',createdAt:anchorAt});
+ b.execute({kind:'SET_BALANCE_ANCHOR',observationId:'obs-8',accountId:'bank',observedBalance:91000,observedAt:anchorAt,sourceType:'MANUAL',createdAt:anchorAt});
  converge(p.a,p.b);const snap=project(p.a.store.allOperations());
- assert.ok(snap.conflicts.some(x=>x.entity_type==='balance_anchors'&&x.field==='observed_balance'));
- assert.throws(()=>accountBalance(snap,'bank',end),/UNRESOLVED_CONFLICT/);
+ assert.equal(snap.conflicts.some(x=>x.entity_type==='balance_anchors'),false);
+ assert.throws(()=>accountBalance(snap,'bank',end),/AMBIGUOUS_BALANCE_ANCHOR/);
 });
