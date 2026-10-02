@@ -8,7 +8,7 @@ import {resolveRefundRelation,type RefundRelationResolution} from '../importing/
 import {emptyChannel} from '../importing/channel.ts';
 import {resolveReturnAllocation} from '../domain/return-allocation.ts';
 
-export type ImportDisposition='INTERPRETED'|'NO_EFFECT'|'SKIP_DUPLICATE'|'REVIVE_EXISTING'|'NEEDS_ATTENTION';
+export type ImportDisposition='INTERPRETED'|'NO_EFFECT'|'SKIP_DUPLICATE'|'REVIVE_EXISTING'|'SOURCE_UPDATE'|'NEEDS_ATTENTION';
 
 export type PreparedImportRecord={
  externalRecordId:string;
@@ -95,7 +95,7 @@ export class ImportStatementService {
    const baseAttention=[...prepared.attention];
    if(prepared.disposition!=='INTERPRETED'){
     allAttention.push(...baseAttention);
-    resolved.push({...prepared,ledgerState:prepared.disposition==='NEEDS_ATTENTION'?'NEEDS_ATTENTION':'NOT_APPLICABLE',account:null,relation:null});
+    resolved.push({...prepared,ledgerState:['NEEDS_ATTENTION','SOURCE_UPDATE'].includes(prepared.disposition)?'NEEDS_ATTENTION':'NOT_APPLICABLE',account:null,relation:null});
     continue;
    }
 
@@ -198,12 +198,17 @@ export class ImportStatementService {
     value:record.sourceIdentity,
     platform:record.platformRaw,
     profile:record.profile,
-    orderId:record.facts.orderId
+    orderId:record.facts.orderId,rawPayload:record.rawPayload
    },input.ledger.entities);
 
    if(sourceMatch.activeTransactionIds.length===1){
+    const transactionId=sourceMatch.activeTransactionIds[0];
+    if(sourceMatch.changedEvidenceTransactionIds.includes(transactionId)&&!sourceMatch.exactEvidenceTransactionIds.includes(transactionId)){
+     const items=[createAttention({sessionId:input.sessionId,externalRecordId:record.id,kind:'SOURCE_UPDATE',question:'官方来源提供了这笔交易的新证据；新证据已保留，账务变化需要单独核对',blocking:true,candidates:[{id:transactionId,label:transactionId}],createdAt:input.now})];
+     allAttention.push(...items);prepared.push({externalRecordId:record.id,disposition:'SOURCE_UPDATE',transactionId,interpretation,attention:items});continue;
+    }
     skippedDuplicateCount++;
-    prepared.push({externalRecordId:record.id,disposition:'SKIP_DUPLICATE',transactionId:sourceMatch.activeTransactionIds[0],interpretation,attention:[]});
+    prepared.push({externalRecordId:record.id,disposition:'SKIP_DUPLICATE',transactionId,interpretation,attention:[]});
     continue;
    }
    if(sourceMatch.activeTransactionIds.length>1){
