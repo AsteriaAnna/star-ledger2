@@ -46,7 +46,9 @@ function validateInterpretation(sessionId:string,record:ExternalRecord,value:Eve
 }
 
 export class ImportStatementService {
- constructor(private workspace:ImportWorkspaceRepository,private memories?:ResolutionMemoryRepository){}
+ private workspace:ImportWorkspaceRepository;
+ private memories:ResolutionMemoryRepository|undefined;
+ constructor(workspace:ImportWorkspaceRepository,memories?:ResolutionMemoryRepository){this.workspace=workspace;this.memories=memories;}
 
  async resolveFundingAccount(request:AccountResolutionRequest,ledger:LedgerSnapshot){
   const deterministic=resolveAccount({...request,rememberedAccountId:null},ledger.entities,ledger.conflicts);
