@@ -36,3 +36,10 @@ test('remembered mapping cannot override a unique deterministic channel match',(
  const r=resolveAccount({eventKind:'PURCHASE',sourceSystem:'ALIPAY',platform:'支付宝',profile:'本人',channelRaw:'余额',role:'ACCOUNT',sponsored:false,rememberedAccountId:'a2'},entities,[]);
  assert.equal(r.state,'RESOLVED');assert.equal(r.accountId,'a1');assert.equal(r.reason,'按明确资金渠道唯一匹配');
 });
+
+test('repayment target and ordinary transfer target never share one memory scope',()=>{
+ const entities=[account('asset','银行卡','ASSET'),account('debt','花呗','LIABILITY')];
+ const repayment=resolveAccount({eventKind:'REPAYMENT',sourceSystem:'ALIPAY',platform:'支付宝',profile:'本人',channelRaw:'花呗',role:'TARGET',sponsored:false},entities,[]);
+ const transfer=resolveAccount({eventKind:'INTERNAL_TRANSFER',sourceSystem:'ALIPAY',platform:'支付宝',profile:'本人',channelRaw:'银行卡',role:'TARGET',sponsored:false},entities,[]);
+ assert.equal(repayment.memoryKey?.role,'REPAYMENT_TARGET');assert.equal(transfer.memoryKey?.role,'TRANSFER_TARGET');
+});
