@@ -1,7 +1,7 @@
 import type {LedgerSnapshot} from '../../../packages/accounting/index.ts';
 import {ImportStatementService,type ResolveImportResult} from '../../../packages/application/import-service.ts';
 import {planImportCommit,type ImportCommitPlan} from '../../../packages/application/import-commit.ts';
-import {completeImportSession,importRecordOutcomes,planImportExecution,type ImportExecutionPlan} from '../../../packages/application/import-execution.ts';
+import {completeImportSessionFromOutcomes,importRecordOutcomes,mergeImportOutcomes,planImportExecution,type ImportExecutionPlan} from '../../../packages/application/import-execution.ts';
 import {BusinessAccountingService} from '../../../packages/accounting/business.ts';
 import {mutate} from './store.ts';
 import type {ExternalRecord} from '../../../packages/importing/types.ts';
@@ -44,11 +44,12 @@ export async function commitResolvedWebImport(resolved:ResolvedWebImport,now:str
   const current=store.state.importWorkspace??{sessions:{},records:{},attention:{},outcomes:{}};
   current.outcomes??={};
   const attention=current.attention[resolved.result.session.id]??resolved.result.records.flatMap(record=>record.attention);
-  const session=completeImportSession(resolved.result.session,execution,attention,now);
+  const outcomes=mergeImportOutcomes(current.outcomes[resolved.result.session.id]??[],importRecordOutcomes(resolved.result.session.id,execution,now));
+  const session=completeImportSessionFromOutcomes(resolved.result.session,outcomes,attention,now);
   current.sessions[session.id]=structuredClone(session);
   current.records[session.id]=structuredClone(resolved.records);
   current.attention[session.id]=structuredClone(attention);
-  current.outcomes[session.id]=importRecordOutcomes(session.id,execution,now);
+  current.outcomes[session.id]=outcomes;
   store.state.importWorkspace=current;output={execution,session};
  });
  if(!output)throw Error('IMPORT_COMMIT_FAILED');
