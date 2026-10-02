@@ -73,10 +73,30 @@ export function reconcileAccount(snapshot:LedgerSnapshot,accountId:string,observ
  const ledger=accountLedger(snapshot,accountId,observedAt);
  return {accountId,observedAt,observedBalance,ledgerBalance:ledger.balance,difference:addMoney([observedBalance,-ledger.balance]),ledger};
 }
-export function consumptionInPeriod(snapshot:LedgerSnapshot,startInclusive:string,endExclusive:string):number {
+export type ConsumptionContribution={transactionId:string;effectId:string;amount:number;categoryId:string|null;effectiveAt:string;displayName:string};
+export function consumptionContributions(snapshot:LedgerSnapshot,startInclusive:string,endExclusive:string):ConsumptionContribution[] {
  clear(snapshot);const start=time(startInclusive),end=time(endExclusive);if(start>=end)throw Error('INVALID_PERIOD');
- return addMoney(snapshot.entities.filter(e=>e.type==='consumption_effects'&&transaction(snapshot,e.fields.transaction_id as string))
-  .filter(e=>{const date=time(e.fields.effective_at as string);return date>=start&&date<end;}).map(e=>e.fields.amount as number));
+ return snapshot.entities.filter(e=>e.type==='consumption_effects').map(effect=>({effect,transaction:transaction(snapshot,String(effect.fields.transaction_id))}))
+  .filter((x):x is {effect:Entity;transaction:Entity}=>!!x.transaction)
+  .filter(x=>{const date=time(String(x.effect.fields.effective_at));return date>=start&&date<end;})
+  .map(x=>({transactionId:x.transaction.id,effectId:x.effect.id,amount:Number(x.effect.fields.amount),categoryId:x.effect.fields.category_id===null?null:String(x.effect.fields.category_id),effectiveAt:String(x.effect.fields.effective_at),displayName:String(x.transaction.fields.display_name)}))
+  .sort((a,b)=>time(a.effectiveAt)-time(b.effectiveAt)||a.transactionId.localeCompare(b.transactionId)||a.effectId.localeCompare(b.effectId));
+}
+export function consumptionInPeriod(snapshot:LedgerSnapshot,startInclusive:string,endExclusive:string):number {
+ return addMoney(consumptionContributions(snapshot,startInclusive,endExclusive).map(row=>row.amount));
+}
+export type ConsumptionBreakdownItem={key:string;amount:number;transactionIds:string[]};
+export function consumptionByCategory(snapshot:LedgerSnapshot,startInclusive:string,endExclusive:string):ConsumptionBreakdownItem[] {
+ const groups=new Map<string,ConsumptionContribution[]>();
+ for(const row of consumptionContributions(snapshot,startInclusive,endExclusive)){const key=row.categoryId??'未分类';groups.set(key,[...(groups.get(key)??[]),row]);}
+ return [...groups.entries()].map(([key,rows])=>({key,amount:addMoney(rows.map(row=>row.amount)),transactionIds:[...new Set(rows.map(row=>row.transactionId))]}))
+  .sort((a,b)=>Math.abs(b.amount)-Math.abs(a.amount)||a.key.localeCompare(b.key));
+}
+export function consumptionByDay(snapshot:LedgerSnapshot,startInclusive:string,endExclusive:string):ConsumptionBreakdownItem[] {
+ const groups=new Map<string,ConsumptionContribution[]>();
+ for(const row of consumptionContributions(snapshot,startInclusive,endExclusive)){const key=row.effectiveAt.slice(0,10);groups.set(key,[...(groups.get(key)??[]),row]);}
+ return [...groups.entries()].map(([key,rows])=>({key,amount:addMoney(rows.map(row=>row.amount)),transactionIds:[...new Set(rows.map(row=>row.transactionId))]}))
+  .sort((a,b)=>a.key.localeCompare(b.key));
 }
 export function unresolvedMovements(snapshot:LedgerSnapshot):Entity[] {
  clear(snapshot);return snapshot.entities.filter(e=>e.type==='balance_movements'&&e.fields.account_id===null&&e.fields.amount!==0&&transaction(snapshot,e.fields.transaction_id as string));
