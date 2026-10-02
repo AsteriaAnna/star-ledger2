@@ -22,6 +22,7 @@ export type Refund = EventBase & {kind:'REFUND'|'RETURN';amount:number;originalI
  funding?:'OWN'|'EXTERNAL_SPONSOR';categoryId?:string;consumptionReduction?:number};
 export type Meaning = {kind:'SET_CONSUMPTION';transactionId:string;amount:number;categoryId:string|null};
 export type DeleteTransaction = {kind:'DELETE_TRANSACTION';transactionId:string;deletedAt:string};
+export type RestoreTransaction = {kind:'RESTORE_TRANSACTION';transactionId:string};
 /** A fully resolved accounting intent ready for domain validation and posting. */
 export type LedgerIntent = Purchase|Income|InternalTransfer|Withdrawal|ExternalPayment|Repayment|Refund;
 /** @deprecated Use LedgerIntent. Kept during the M4 parallel migration. */
@@ -35,4 +36,4 @@ export type UnlinkReturn = {kind:'UNLINK_RETURN';transactionId:string;detachedAt
 export type CorrectTransaction={kind:'CORRECT_TRANSACTION';transactionId:string;replacement:LedgerIntent;expectedSnapshot:string;correctedAt:string};
 /** @deprecated V1 compatibility only. New application code uses CORRECT_TRANSACTION. */
 export type CorrectImportedEvent={kind:'CORRECT_IMPORTED_EVENT';transactionId:string;replacement:FinancialEvent;expectedSnapshot:string;sourceId:string;correctedAt:string};
-export type BusinessCommand = CorrectTransaction|CorrectImportedEvent|LinkReturn|UnlinkReturn| CorrectAmount|SetBalanceAnchor| ResolveSettlement| SetStatus|BindAccount| DeleteTransaction| CreateAccount|Purchase|Income|InternalTransfer|Withdrawal|ExternalPayment|Repayment|Refund|Meaning;
+export type BusinessCommand = CorrectTransaction|CorrectImportedEvent|LinkReturn|UnlinkReturn| CorrectAmount|SetBalanceAnchor| ResolveSettlement| SetStatus|BindAccount| DeleteTransaction|RestoreTransaction| CreateAccount|Purchase|Income|InternalTransfer|Withdrawal|ExternalPayment|Repayment|Refund|Meaning;
