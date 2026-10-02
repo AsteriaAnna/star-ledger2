@@ -5,6 +5,7 @@ import type {AttentionItem,EventInterpretation,ExternalRecord,ImportSession,Impo
 import type {ImportWorkspaceRepository,ResolutionMemoryRepository} from './ports.ts';
 import {resolveAccount,type AccountResolution,type AccountResolutionRequest} from '../importing/account-resolution.ts';
 import {resolveRefundRelation,type RefundRelationResolution} from '../importing/relation-resolution.ts';
+import {emptyChannel} from '../importing/channel.ts';
 
 export type ImportDisposition='INTERPRETED'|'NO_EFFECT'|'SKIP_DUPLICATE'|'REVIVE_EXISTING'|'NEEDS_ATTENTION';
 
@@ -123,7 +124,7 @@ export class ImportStatementService {
     return {id,label:String(entity?.fields.name||id)};
    });
    if(account?.state==='SPLIT')items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'SPLIT_PAYMENT',question:'这笔记录使用了多个资金账户，需要确认资金如何分摊',blocking:true,candidates:accountCandidates,createdAt:input.now}));
-   else if(account&&['SUGGESTED','UNRESOLVED','INVALID_MEMORY','CONFLICT'].includes(account.state)&&source.facts.channelRaw.trim()){
+   else if(account&&['SUGGESTED','UNRESOLVED','INVALID_MEMORY','CONFLICT'].includes(account.state)&&!emptyChannel(source.facts.channelRaw)){
     items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'ACCOUNT',question:account.reason,blocking:false,candidates:accountCandidates,createdAt:input.now}));
    }
 
