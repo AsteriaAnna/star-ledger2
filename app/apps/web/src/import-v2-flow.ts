@@ -22,7 +22,7 @@ export async function resolveLegacyImportBatch(input:{
  service:ImportStatementService;
 }):Promise<ResolvedWebImport>{
  if(!input.drafts.length)throw Error('EMPTY_IMPORT');
- const records=input.drafts.map(draft=>legacyDraftToExternalRecord(draft,input.sessionId,input.now));
+ const records=input.drafts.map((draft,index)=>legacyDraftToExternalRecord(draft,input.sessionId,input.now,`${input.sessionId}:observation:${index}`));
  const sourceTypes=new Set(records.map(record=>record.sourceType)),sourceSystems=new Set(records.map(record=>record.sourceSystem));
  if(sourceTypes.size!==1||sourceSystems.size!==1)throw Error('MIXED_IMPORT_SOURCE');
  const interpretations=input.drafts.map((draft,index)=>legacyDraftToInterpretation(draft,records[index]));
