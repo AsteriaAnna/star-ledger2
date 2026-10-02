@@ -14,8 +14,8 @@ function merchant(value:string){return value.replace(/[-－—]退款$|^退款[-
 function refundAnnotation(statusText:string):{kind:'full'}|{kind:'partial';amount:number}|null{
  if(!statusText)return null;
  if(/已全额退款/.test(statusText))return {kind:'full'};
- const m=statusText.match(/已退款[（(]?[¥￥]\s*(\d+(?:\.\d{1,2})?)/);
- return m?{kind:'partial',amount:Math.round(Number(m[1])*100)}:null;
+ const m=statusText.match(/已退款[（(]?[¥￥]\s*((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?)/);
+ return m?{kind:'partial',amount:Math.round(Number(m[1].replace(/,/g,''))*100)}:null;
 }
 // 平台标注是权威键：退款行与某笔原消费的状态标注能对上（同为「已全额退款」且金额相等，或退款总额相同），即视为同一笔。
 function annotationMatches(refundAnn:NonNullable<ReturnType<typeof refundAnnotation>>,sources:any[],displayAmount:number,amount:number){
