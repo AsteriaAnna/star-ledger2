@@ -55,9 +55,19 @@ export function planImportExecution(plan:ImportCommitPlan,snapshot:LedgerSnapsho
 }
 
 
+export function mergeImportOutcomes(existing:ImportRecordOutcome[],next:ImportRecordOutcome[]):ImportRecordOutcome[]{
+ const map=new Map(existing.map(item=>[item.externalRecordId,item]));
+ for(const item of next)map.set(item.externalRecordId,item);
+ return [...map.values()].sort((a,b)=>a.externalRecordId.localeCompare(b.externalRecordId));
+}
+export function completeImportSessionFromOutcomes(session:ImportSession,outcomes:ImportRecordOutcome[],attention:AttentionItem[],now:string):ImportSession{
+ const committed=outcomes.filter(item=>item.state==='COMMITTED').length;
+ const skipped=outcomes.filter(item=>item.state==='SKIPPED_DUPLICATE').length;
+ const noEffect=outcomes.filter(item=>item.state==='NO_EFFECT').length;
+ return summarizeSession({...session,committedCount:committed,skippedDuplicateCount:skipped,noEffectCount:noEffect},attention,now);
+}
 export function completeImportSession(session:ImportSession,execution:ImportExecutionPlan,attention:AttentionItem[],now:string):ImportSession{
- const committed=execution.createdIds.length+execution.revivedIds.length;
- return summarizeSession({...session,committedCount:committed,skippedDuplicateCount:execution.skippedDuplicateIds.length,noEffectCount:execution.noEffectRecordIds.length},attention,now);
+ return completeImportSessionFromOutcomes(session,importRecordOutcomes(session.id,execution,now),attention,now);
 }
 
 
