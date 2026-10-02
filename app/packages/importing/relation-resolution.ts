@@ -54,7 +54,7 @@ function activeOriginals(input:RefundResolutionInput,entities:Entity[]){
   if(input.kind==='REFUND'&&e.fields.event_type!=='PURCHASE')return false;
   if(input.kind==='RETURN'&&!['EXTERNAL_TRANSFER','DEPOSIT','RED_PACKET'].includes(String(e.fields.event_type)))return false;
   if(Date.parse(String(e.fields.occurred_at))>at)return false;
-  const returned=entities.filter(link=>link.type==='transaction_links'&&link.fields.to_transaction_id===e.id)
+  const returned=entities.filter(link=>link.type==='transaction_links'&&!link.fields.deleted_at&&link.fields.to_transaction_id===e.id)
    .map(link=>entities.find(t=>t.type==='transactions'&&t.id===link.fields.from_transaction_id))
    .filter(t=>t&&!t.fields.deleted_at&&!t.fields.purged_at&&t.fields.status==='SUCCESS')
    .reduce((sum,t)=>sum+Number(t!.fields.display_amount),0);
