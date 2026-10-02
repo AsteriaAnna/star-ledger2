@@ -23,7 +23,7 @@ test('commit plan separates automatic writes from duplicate no-effect and blocki
   resolved('attention',{attention:[{id:'a2',sessionId:'s',externalRecordId:'attention',kind:'ACCOUNT',question:'账户？',blocking:false,candidates:[],createdAt:now}]})
  ];
  const plan=planImportCommit({session,records},sources);
- assert.equal(plan.newIntents.length,2);
+ assert.equal(plan.newRecords.length,2);
  assert.deepEqual(plan.skippedDuplicateIds,['duplicate']);assert.deepEqual(plan.noEffectRecordIds,['failed']);assert.deepEqual(plan.blockedRecordIds,['blocked']);
  assert.deepEqual(plan.attentionRecordIds.sort(),['attention','blocked']);
 });
@@ -31,13 +31,13 @@ test('commit plan separates automatic writes from duplicate no-effect and blocki
 test('non-blocking attention never prevents a known financial fact from committing',()=>{
  const r=source('refund'),row=resolved('refund',{interpretation:{...resolved('refund').interpretation,eventKind:'REFUND'},attention:[{id:'a',sessionId:'s',externalRecordId:'refund',kind:'REFUND_RELATION',question:'可能对应哪笔？',blocking:false,candidates:[],createdAt:now}]});
  const plan=planImportCommit({session:{...session,sourceCount:1},records:[row]},[r]);
- assert.equal(plan.newIntents.length,1);assert.equal(plan.newIntents[0].kind,'REFUND');assert.deepEqual(plan.blockedRecordIds,[]);
+ assert.equal(plan.newRecords.length,1);assert.equal(plan.newRecords[0].intent.kind,'REFUND');assert.deepEqual(plan.blockedRecordIds,[]);
 });
 
 test('revive plan preserves existing transaction identity instead of creating a second economic record',()=>{
  const r=source('revive'),row=resolved('revive',{disposition:'REVIVE_EXISTING',transactionId:'old-transaction',ledgerState:'NOT_APPLICABLE'});
  const plan=planImportCommit({session:{...session,sourceCount:1},records:[row]},[r]);
- assert.equal(plan.newIntents.length,0);assert.equal(plan.revivals.length,1);assert.equal(plan.revivals[0].transactionId,'old-transaction');assert.equal(plan.revivals[0].replacement.id,'old-transaction');
+ assert.equal(plan.newRecords.length,0);assert.equal(plan.revivals.length,1);assert.equal(plan.revivals[0].transactionId,'old-transaction');assert.equal(plan.revivals[0].replacement.id,'old-transaction');
 });
 
 test('commit planning fails if a resolved record has lost its source evidence',()=>{
