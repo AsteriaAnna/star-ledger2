@@ -64,3 +64,11 @@ test('recognized repayment reaches ledger with unresolved liability endpoint ins
  const intent=buildImportedLedgerIntent({resolved:out.record,source:r});assert.equal(intent.kind,'REPAYMENT');
  if(intent.kind==='REPAYMENT'){assert.equal(intent.to,null);}
 });
+
+
+test('changed raw evidence keeps transaction identity but gets a new immutable SourceRecord id',async()=>{
+ const first=record('evolving'),second={...record('evolving'),rawPayload:'{"status":"updated"}'};
+ assert.equal(importedTransactionId(first),importedTransactionId(second));
+ assert.notEqual(importedSourceRecordId(first),importedSourceRecordId(second));
+ assert.equal(importedSourceRecordId(first),importedSourceRecordId({...first}));
+});
