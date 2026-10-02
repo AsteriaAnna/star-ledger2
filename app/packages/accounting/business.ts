@@ -59,7 +59,7 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
   const generated=interpret({...c.replacement,source:undefined},clean),result:Command[]=[];
   const correctionKey=c.kind==='CORRECT_IMPORTED_EVENT'?c.sourceId:c.correctedAt;
   const proposed=generated.find(c=>c.entity.type==='transactions')!.entity;
-  for(const key of ['event_type','status','occurred_at','display_amount'])if(t.fields[key]!==proposed.fields[key])result.push({action:'PATCH_FIELD',entity:{type:'transactions',id:t.id,fields:{[key]:proposed.fields[key]}}});
+  for(const key of ['event_type','status','occurred_at','display_amount','display_name','note'])if(t.fields[key]!==proposed.fields[key])result.push({action:'PATCH_FIELD',entity:{type:'transactions',id:t.id,fields:{[key]:proposed.fields[key]}}});
   for(const m of entities.filter(e=>e.type==='balance_movements'&&e.fields.transaction_id===t.id&&e.fields.amount!==0))result.push({action:'PATCH_FIELD',entity:{type:m.type,id:m.id,fields:{amount:0}}});
   const postings:Entity[]=[];let index=0;
   for(const cmd of generated.filter(cmd=>!['transactions','source_records'].includes(cmd.entity.type))){
