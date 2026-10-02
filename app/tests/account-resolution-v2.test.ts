@@ -30,3 +30,9 @@ test('sponsored purchase has no own-account question',()=>{
  const r=resolveAccount({eventKind:'PURCHASE',platform:'微信',profile:'本人',channelRaw:'亲属卡',role:'ACCOUNT',sponsored:true},[],[]);
  assert.equal(r.state,'NOT_APPLICABLE');
 });
+
+test('remembered mapping cannot override a unique deterministic channel match',()=>{
+ const entities=[account('a1','支付宝余额','ASSET',''),account('a2','旧的自定义账户','ASSET','')];
+ const r=resolveAccount({eventKind:'PURCHASE',platform:'支付宝',profile:'本人',channelRaw:'余额',role:'ACCOUNT',sponsored:false,rememberedAccountId:'a2'},entities,[]);
+ assert.equal(r.state,'RESOLVED');assert.equal(r.accountId,'a1');assert.equal(r.reason,'按明确资金渠道唯一匹配');
+});
