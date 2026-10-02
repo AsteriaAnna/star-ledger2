@@ -38,12 +38,6 @@ export function resolveAccount(request:AccountResolutionRequest,entities:Entity[
  const normalized=channelKey(request.channelRaw);
  const memoryKey={sourceSystem:request.platform,profile:request.profile,channelKey:descriptor?.identity||normalized,role:request.role};
  const accounts=entities.filter(e=>allowed(request,e));
- if(request.rememberedAccountId){
-  const remembered=accounts.find(a=>a.id===request.rememberedAccountId);
-  if(!remembered)return {state:'INVALID_MEMORY',accountId:null,candidates:[],reason:'已记住的账户已不存在或不再适用',memoryKey};
-  if(conflicts.some(c=>c.entity_type==='accounts'&&c.entity_id===remembered.id))return {state:'CONFLICT',accountId:null,candidates:[remembered.id],reason:'已记住的账户存在同步冲突',memoryKey};
-  return {state:'RESOLVED',accountId:remembered.id,candidates:[remembered.id],reason:'使用已确认的账户关系',memoryKey};
- }
 
  const candidates=accounts.filter(account=>{
   if(descriptor&&account.fields.type!==descriptor.type)return false;
@@ -61,6 +55,14 @@ export function resolveAccount(request:AccountResolutionRequest,entities:Entity[
  const clear=candidates.filter(id=>!conflicts.some(c=>c.entity_type==='accounts'&&c.entity_id===id));
  if(clear.length===1)return {state:'RESOLVED',accountId:clear[0],candidates:clear,reason:'按明确资金渠道唯一匹配',memoryKey};
  if(candidates.length===1&&!clear.length)return {state:'CONFLICT',accountId:null,candidates,reason:'唯一候选账户存在同步冲突',memoryKey};
+
+ // A remembered user decision may disambiguate multiple/renamed accounts, but never overrides a unique deterministic match above.
+ if(request.rememberedAccountId){
+  const remembered=accounts.find(a=>a.id===request.rememberedAccountId);
+  if(!remembered)return {state:'INVALID_MEMORY',accountId:null,candidates:[],reason:'已记住的账户已不存在或不再适用',memoryKey};
+  if(conflicts.some(c=>c.entity_type==='accounts'&&c.entity_id===remembered.id))return {state:'CONFLICT',accountId:null,candidates:[remembered.id],reason:'已记住的账户存在同步冲突',memoryKey};
+  return {state:'RESOLVED',accountId:remembered.id,candidates:[remembered.id],reason:'使用已确认的账户关系',memoryKey};
+ }
  if(clear.length>1)return {state:'SUGGESTED',accountId:null,candidates:clear,reason:'存在多个可能账户，需要选择一次',memoryKey};
 
  const weak=descriptor?.last4?accounts.filter(a=>String(a.fields.last4||'')===descriptor.last4).map(a=>a.id):[];
