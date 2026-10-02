@@ -7,6 +7,7 @@ export type SourcePrecision='second'|'minute'|'day'|'invalid'|string;
 export type NormalizedSourceFacts={
  occurredAt:string|null;
  amountFen:number|null;
+ feeFen?:number|null;
  transactionTypeRaw:string;
  directionRaw:string;
  statusRaw:string;
