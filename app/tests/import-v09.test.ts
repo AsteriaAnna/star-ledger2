@@ -87,6 +87,11 @@ test('WeChat refund status annotation links partial and full refunds despite mer
  assert.equal(partial[1].kind,'REFUND');
  assert.equal(resolveRefund(partial[1],refundContext([],partial)).id,'import-'+partial[0].identity);
  assert.equal(resolveRefund(partial[1],refundContext([],partial)).reason,'已按退款状态标注金额关联');
+ // 千位分隔符仍属于同一个平台退款金额标注。
+ const thousands=parseRows([wh,
+  ['2026-09-20 12:00:00','商户消费','大额商户','订单','支出','2000.00','零钱','已退款(¥1,234.56)','paid-comma'],
+  ['2026-09-21 12:00:00','商户退款','不同名称','退款','收入','44.00','/','已退款¥1,234.56','refund-comma']]);
+ assert.equal(resolveRefund(thousands[1],refundContext([],thousands)).id,'import-'+thousands[0].identity);
  // 全额退款：两侧同为「已全额退款」，商户名差异不阻断。
  const full=parseRows([wh,
   ['2026-09-20 12:00:00','商户消费','淘宝平台','订单','支出','59.28','零钱','已全额退款','paid2'],
