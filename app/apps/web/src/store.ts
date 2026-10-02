@@ -10,8 +10,9 @@ import {hash} from './normalize.ts';
 export {hash} from './normalize.ts';
 import {GitHubSyncProvider} from '../../../packages/sync/github.ts';
 import {webSessionCrypto} from '../../../packages/platform/web-crypto.ts';
-export type State={version:2;imports?:Draft[];importRevision?:number;revision:number;device:string;ops:Operation[];pending:string[];batches:{device:string;seq:number;checksum:string}[];envelopes:Record<string,string>;settings:Record<string,any>};
-export const fresh=():State=>({version:2,imports:[],importRevision:0,revision:0,device:crypto.randomUUID(),ops:[],pending:[],batches:[],envelopes:{},settings:{budget:300000,categories:['餐饮','购物','交通','生活','娱乐','学习','医疗','其他'],mode:'auto'}});
+import type {ImportWorkspaceSnapshot} from '../../../packages/importing/workspace.ts';
+export type State={version:2;imports?:Draft[];importRevision?:number;importWorkspace?:ImportWorkspaceSnapshot;revision:number;device:string;ops:Operation[];pending:string[];batches:{device:string;seq:number;checksum:string}[];envelopes:Record<string,string>;settings:Record<string,any>};
+export const fresh=():State=>({version:2,imports:[],importRevision:0,importWorkspace:{sessions:{},records:{},attention:{}},revision:0,device:crypto.randomUUID(),ops:[],pending:[],batches:[],envelopes:{},settings:{budget:300000,categories:['餐饮','购物','交通','生活','娱乐','学习','医疗','其他'],mode:'auto'}});
 export class MemoryStore implements SyncStore {
  state:State;entities:Entity[];conflicts:Conflict[];
  constructor(state:State){this.state=structuredClone(state);const p=project(state.ops);this.entities=p.entities;this.conflicts=p.conflicts;}
