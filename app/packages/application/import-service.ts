@@ -187,12 +187,21 @@ export class ImportStatementService {
 
   const prepared:PreparedImportRecord[]=[];
   const allAttention:AttentionItem[]=[];
+  const batchSources=new Map<string,string>();
   let skippedDuplicateCount=0,noEffectCount=0;
 
   for(const record of input.records){
    const interpretation=byRecord.get(record.id);
    if(!interpretation)throw Error('MISSING_INTERPRETATION');
    if(interpretation.externalRecordId!==record.id)throw Error('INTERPRETATION_RECORD_MISMATCH');
+   const batchKey=[record.sourceSystem,record.platformRaw,record.profile,record.sourceIdentity].join('\u001f');
+   const priorRaw=batchSources.get(batchKey);
+   if(priorRaw!==undefined){
+    if(priorRaw===record.rawPayload){skippedDuplicateCount++;prepared.push({externalRecordId:record.id,disposition:'SKIP_DUPLICATE',transactionId:null,interpretation,attention:[]});continue;}
+    const items=[createAttention({sessionId:input.sessionId,externalRecordId:record.id,kind:'SOURCE_UPDATE',question:'同一来源在这批账单中出现了新的官方证据；证据会保留，账务变化需要单独核对',blocking:true,candidates:[],createdAt:input.now})];
+    allAttention.push(...items);prepared.push({externalRecordId:record.id,disposition:'SOURCE_UPDATE',transactionId:null,interpretation,attention:items});continue;
+   }
+   batchSources.set(batchKey,record.rawPayload);
 
    const sourceMatch=findSourceMatch({
     value:record.sourceIdentity,
