@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {BusinessAccountingService} from '../packages/accounting/business.ts';
-import {planImportExecution} from '../packages/application/import-execution.ts';
+import {completeImportSessionFromOutcomes,importRecordOutcomes,mergeImportOutcomes,planImportExecution} from '../packages/application/import-execution.ts';
 import {pair} from './helpers.ts';
 import {project} from '../packages/sync/projection.ts';
 
@@ -38,4 +38,19 @@ test('purged transaction cannot be revived by reimport',t=>{
  service.execute(intent('old'));service.execute({kind:'DELETE_TRANSACTION',transactionId:'old',deletedAt:'2026-10-02T11:00:00Z'});
  p.a.service.execute([{action:'PATCH_FIELD',entity:{type:'transactions',id:'old',fields:{purged_at:'2026-10-02T11:30:00Z'}}}]);
  assert.throws(()=>planImportExecution({newRecords:[],revivals:[{transactionId:'old',replacement:intent('old'),externalRecordId:'source'}],skippedDuplicateIds:[],noEffectRecordIds:[],blockedRecordIds:[],attentionRecordIds:[]},project(p.a.store.allOperations()),at),/TRANSACTION_UNAVAILABLE/);
+});
+
+
+test('session recovery keeps prior committed outcomes distinct from pre-existing duplicates',()=>{
+ const base={id:'s',sourceType:'EXCEL' as const,sourceSystem:'WECHAT' as const,createdAt:at,updatedAt:at,state:'NEEDS_ATTENTION' as const,sourceCount:3,committedCount:1,skippedDuplicateCount:0,noEffectCount:0,blockingAttentionCount:1,nonBlockingAttentionCount:0,failureCode:null};
+ const prior=[{sessionId:'s',externalRecordId:'already',state:'COMMITTED' as const,transactionId:'tx-already',updatedAt:at},{sessionId:'s',externalRecordId:'duplicate',state:'SKIPPED_DUPLICATE' as const,transactionId:null,updatedAt:at}];
+ const later=[{sessionId:'s',externalRecordId:'blocked',state:'COMMITTED' as const,transactionId:'tx-blocked',updatedAt:'2026-10-02T12:00:00Z'}];
+ const merged=mergeImportOutcomes(prior,later),session=completeImportSessionFromOutcomes(base,merged,[],'2026-10-02T12:00:00Z');
+ assert.equal(session.committedCount,2);assert.equal(session.skippedDuplicateCount,1);assert.equal(session.state,'COMPLETED');
+});
+
+test('execution outcomes preserve external record identity instead of inferring it from transaction ids',()=>{
+ const execution={commands:[],createdIds:['tx-a'],createdRecordIds:['source-a'],revivedIds:['old-tx'],revivedRecordIds:['source-old'],skippedDuplicateIds:['source-dup'],noEffectRecordIds:['source-failed'],blockedRecordIds:['source-blocked']};
+ const outcomes=importRecordOutcomes('s',execution,at);
+ assert.deepEqual(outcomes.map(x=>[x.externalRecordId,x.state]).sort(),[['source-a','COMMITTED'],['source-blocked','BLOCKED'],['source-dup','SKIPPED_DUPLICATE'],['source-failed','NO_EFFECT'],['source-old','COMMITTED']].sort());
 });
