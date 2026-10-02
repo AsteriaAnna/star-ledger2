@@ -50,7 +50,7 @@ export function resolveRefund(d:Draft,entities:Entity[]){
  const candidates=entities.filter(t=>{
   if(t.type!=='transactions'||t.fields.deleted_at||t.fields.status!=='SUCCESS'||(d.kind==='REFUND'?t.fields.event_type!=='PURCHASE':!['EXTERNAL_TRANSFER','DEPOSIT','RED_PACKET'].includes(String(t.fields.event_type))))return false;
   const delta=at-Date.parse(String(t.fields.occurred_at));if(delta<0)return false;
-  const previous=entities.filter(e=>e.type==='transaction_links'&&e.fields.to_transaction_id===t.id).map(e=>entities.find(t=>t.type==='transactions'&&t.id===e.fields.from_transaction_id)).filter(t=>t&&!t.fields.deleted_at&&t.fields.status==='SUCCESS').reduce((n,t)=>n+Number(t!.fields.display_amount),0);
+  const previous=entities.filter(e=>e.type==='transaction_links'&&!e.fields.deleted_at&&e.fields.to_transaction_id===t.id).map(e=>entities.find(t=>t.type==='transactions'&&t.id===e.fields.from_transaction_id)).filter(t=>t&&!t.fields.deleted_at&&t.fields.status==='SUCCESS').reduce((n,t)=>n+Number(t!.fields.display_amount),0);
   if(amount+previous>Number(t.fields.display_amount))return false;
   if(d.originalMode==='manual')return t.id===d.original;
   const consumption=Number(entities.find(e=>e.type==='consumption_effects'&&e.fields.transaction_id===t.id)?.fields.amount||0);
