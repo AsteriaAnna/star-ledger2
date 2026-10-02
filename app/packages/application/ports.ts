@@ -4,6 +4,7 @@ export type AccountIdentity={
  sourceSystem:string;
  profile:string;
  channelKey:string;
+ role:string;
 };
 
 export type AccountMapping={
