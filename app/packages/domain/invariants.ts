@@ -15,7 +15,7 @@ export function financialIssues(entities:Entity[]):FinancialIssue[] {
   const set=sourceTransactions.get(identity)||new Set<string>();set.add(id);sourceTransactions.set(identity,set);
  }
  for(const set of sourceTransactions.values())if(set.size>1){const involved=[...set].sort();issues.push({transactionId:involved[0],code:'DUPLICATE_SOURCE_TRANSACTION',involved});}
- for(const link of entities.filter(e=>e.type==='transaction_links')) {
+ for(const link of entities.filter(e=>e.type==='transaction_links'&&!e.fields.deleted_at)) {
   const from=get(link.fields.from_transaction_id as string);if(!active(from))continue;
   const target=link.fields.to_transaction_id as string;
   const entries=groups.get(target)??[];
