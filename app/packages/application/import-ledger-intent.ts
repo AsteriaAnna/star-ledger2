@@ -29,6 +29,8 @@ export function importSourcePayload(source:ExternalRecord){
  });
 }
 
+export function importedSourceEvidence(source:ExternalRecord):SourceEvidence{return {id:importedSourceRecordId(source),sourceType:source.sourceType,platform:source.platformRaw,rawPayload:importSourcePayload(source),capturedAt:source.capturedAt};}
+
 export function buildImportedLedgerIntent(input:LedgerIntentBuildInput):LedgerIntent{
  const {resolved,source}=input,interpretation=resolved.interpretation;
  if(resolved.ledgerState!=='READY_FOR_LEDGER'||resolved.disposition!=='INTERPRETED')throw Error('IMPORT_NOT_READY_FOR_LEDGER');
@@ -38,7 +40,7 @@ export function buildImportedLedgerIntent(input:LedgerIntentBuildInput):LedgerIn
  if(interpretation.eventKind==='UNKNOWN')throw Error('IMPORT_EVENT_NOT_POSTABLE');
 
  const id=importedTransactionId(source);
- const sourceEvidence:SourceEvidence={id:importedSourceRecordId(source),sourceType:source.sourceType,platform:source.platformRaw,rawPayload:importSourcePayload(source),capturedAt:source.capturedAt};
+ const sourceEvidence=importedSourceEvidence(source);
  const base={id,occurredAt:interpretation.occurredAt,name:interpretation.displayName.trim()||source.facts.counterpartyRaw||source.facts.productRaw||source.facts.transactionTypeRaw||'账单记录',amount:interpretation.amountFen,status:interpretation.status,note:source.facts.noteRaw||source.facts.productRaw||'',source:sourceEvidence};
  const account=resolved.account?.state==='RESOLVED'?resolved.account.accountId:null;
  const sourceSponsored=/亲情卡|亲属卡/.test(source.facts.channelRaw);
