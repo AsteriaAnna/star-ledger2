@@ -17,6 +17,7 @@ export class AccountingService {
    const commandId=`${this.device}:${seq+1}`;
    for(const c of commands) {
     const existing=this.store.get(c.entity.type,c.entity.id);
+    const restoredEarlier=(type:Entity['type'],id:string)=>result.some(op=>op.action==='RESOLVE_CONFLICT'&&op.entity.type===type&&op.entity.id===id&&op.entity.fields.deleted_at===null);
     if(c.action==='PATCH_FIELD') {
      const blocked=conflicts.some(x=>(x.entity_type===c.entity.type&&x.entity_id===c.entity.id&&(x.field==='$lifecycle'||Object.hasOwn(c.entity.fields,x.field))) || (x.field==='$lifecycle'&&x.entity_type==='transactions'&&existing?.fields.transaction_id===x.entity_id));
      if(blocked)throw Error('EXPLICIT_RESOLUTION_REQUIRED');
@@ -25,10 +26,10 @@ export class AccountingService {
     }
     if(existing?.fields.transaction_id) {
      const parent=this.store.get('transactions',existing.fields.transaction_id as string);
-     if(parent?.fields.deleted_at)throw Error('PARENT_DELETED');
+     if(parent?.fields.deleted_at&&!restoredEarlier('transactions',String(existing.fields.transaction_id)))throw Error('PARENT_DELETED');
     }
     if(c.action!=='CREATE_ENTITY'&&!existing&&!result.some(o=>o.entity.id===c.entity.id&&o.entity.type===c.entity.type))throw Error('MISSING_ENTITY');
-    if(c.action==='PATCH_FIELD'&&existing?.fields.deleted_at&&!Object.hasOwn(c.entity.fields,'purged_at'))throw Error('ENTITY_DELETED');
+    if(c.action==='PATCH_FIELD'&&existing?.fields.deleted_at&&!restoredEarlier(c.entity.type,c.entity.id)&&!Object.hasOwn(c.entity.fields,'purged_at'))throw Error('ENTITY_DELETED');
     if(c.action==='RESOLVE_CONFLICT'&&Object.hasOwn(c.entity.fields,'deleted_at')&&c.entity.fields.deleted_at!==null&&typeof c.entity.fields.deleted_at!=='string')throw Error('INVALID_RESOLUTION');
     seq++;
     // Observed causal frontier; clocks and timestamps never select a winning edit.
