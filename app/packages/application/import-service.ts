@@ -2,7 +2,8 @@ import type {LedgerSnapshot} from '../accounting/index.ts';
 import {findSourceMatch} from '../importing/dedup.ts';
 import {attentionId,assertAttentionItem,summarizeSession} from '../importing/attention.ts';
 import type {AttentionItem,EventInterpretation,ExternalRecord,ImportSession,ImportSourceType,SourceSystem} from '../importing/types.ts';
-import type {ImportWorkspaceRepository} from './ports.ts';
+import type {ImportWorkspaceRepository,ResolutionMemoryRepository} from './ports.ts';
+import {resolveAccount,type AccountResolutionRequest} from '../importing/account-resolution.ts';
 
 export type ImportDisposition='INTERPRETED'|'NO_EFFECT'|'SKIP_DUPLICATE'|'REVIVE_EXISTING'|'NEEDS_ATTENTION';
 
@@ -45,7 +46,24 @@ function validateInterpretation(sessionId:string,record:ExternalRecord,value:Eve
 }
 
 export class ImportStatementService {
- constructor(private workspace:ImportWorkspaceRepository){}
+ constructor(private workspace:ImportWorkspaceRepository,private memories?:ResolutionMemoryRepository){}
+
+ async resolveFundingAccount(request:AccountResolutionRequest,ledger:LedgerSnapshot){
+  const deterministic=resolveAccount({...request,rememberedAccountId:null},ledger.entities,ledger.conflicts);
+  if(deterministic.state==='RESOLVED'||deterministic.state==='NOT_APPLICABLE'||!deterministic.memoryKey||!this.memories)return deterministic;
+  const remembered=await this.memories.findAccountMapping(deterministic.memoryKey);
+  if(!remembered)return deterministic;
+  return resolveAccount({...request,rememberedAccountId:remembered.accountId},ledger.entities,ledger.conflicts);
+ }
+
+ async rememberFundingAccount(request:AccountResolutionRequest,accountId:string,ledger:LedgerSnapshot,now:string){
+  if(!this.memories)throw Error('RESOLUTION_MEMORY_UNAVAILABLE');
+  const resolution=resolveAccount({...request,rememberedAccountId:null},ledger.entities,ledger.conflicts);
+  if(!resolution.memoryKey)throw Error('ACCOUNT_MEMORY_NOT_APPLICABLE');
+  const account=ledger.entities.find(e=>e.type==='accounts'&&e.id===accountId&&!e.fields.deleted_at);
+  if(!account)throw Error('ACCOUNT_UNAVAILABLE');
+  await this.memories.rememberAccountMapping(resolution.memoryKey,{accountId,rememberedAt:now});
+ }
 
  async prepare(input:PrepareImportInput):Promise<PrepareImportResult>{
   const byRecord=new Map(input.interpretations.map(value=>[value.externalRecordId,value]));
