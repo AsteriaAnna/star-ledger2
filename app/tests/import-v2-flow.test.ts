@@ -24,7 +24,8 @@ test('failed source row becomes no-effect instead of a user review task',async()
 
 test('split funding with unknown allocation remains the explicit blocking exception',async()=>{
  const service=new ImportStatementService(new InMemoryImportWorkspace());
- const out=await resolveLegacyImportBatch({drafts:[draft({channel:'零钱 + 某银行储蓄卡(1234)'})],sessionId:'s',ledger,now,service});
+ const split=draft({channel:'零钱 + 某银行储蓄卡(1234)'});split.raw=JSON.stringify({'交易类型':'商户消费','收/支':'支出','当前状态':'支付成功','支付方式':'零钱 + 某银行储蓄卡(1234)','交易单号':'order-1'});
+ const out=await resolveLegacyImportBatch({drafts:[split],sessionId:'s',ledger,now,service});
  assert.equal(out.result.records[0].ledgerState,'NEEDS_ATTENTION');
  assert.equal(out.result.records[0].attention.some(item=>item.kind==='SPLIT_PAYMENT'&&item.blocking),true);
  assert.deepEqual(out.plan.blockedRecordIds,['row-1']);
