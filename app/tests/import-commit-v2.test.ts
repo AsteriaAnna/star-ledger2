@@ -43,3 +43,12 @@ test('revive plan preserves existing transaction identity instead of creating a 
 test('commit planning fails if a resolved record has lost its source evidence',()=>{
  assert.throws(()=>planImportCommit({session:{...session,sourceCount:1},records:[resolved('missing')]},[]),/MISSING_EXTERNAL_RECORD/);
 });
+
+
+test('changed source evidence plans an evidence-only attachment while accounting stays blocked',()=>{
+ const r={...source('update'),rawPayload:'changed-official-row'};
+ const row=resolved('update',{disposition:'SOURCE_UPDATE',transactionId:'existing',ledgerState:'NEEDS_ATTENTION',attention:[{id:'u',sessionId:'s',externalRecordId:'update',kind:'SOURCE_UPDATE',question:'来源更新',blocking:true,candidates:[{id:'existing',label:'existing'}],createdAt:now}]});
+ const plan=planImportCommit({session:{...session,sourceCount:1},records:[row]},[r]);
+ assert.equal(plan.evidenceUpdates.length,1);assert.equal(plan.evidenceUpdates[0].transactionId,'existing');
+ assert.deepEqual(plan.blockedRecordIds,['update']);assert.equal(plan.newRecords.length,0);
+});
