@@ -19,7 +19,7 @@ const replacement=(amount:number,occurredAt=buyAt,categoryId='餐饮')=>({kind:'
 
 test('linked refund no longer blocks a safe amount correction',t=>{
  const x=setup(t),before=x.snapshot();
- const plan=planTransactionCorrection({transactionId:'buy',replacement:replacement(12000),expectedSnapshot:correctionSnapshot(before.entities,'buy'),sourceId:'audit',correctedAt:'2026-10-02T00:00:00Z'},before);
+ const plan=planTransactionCorrection({transactionId:'buy',replacement:replacement(12000),expectedSnapshot:correctionSnapshot(before.entities,'buy'),correctedAt:'2026-10-02T00:00:00Z'},before);
  assert.deepEqual(plan.relationReviewIds,[]);assert.deepEqual(plan.relinkedReturnIds,['refund']);
  x.service.executeBatch(plan.commands);
  assert.equal(x.spent(),9000);assert.equal(x.balance(),91000);
@@ -28,7 +28,7 @@ test('linked refund no longer blocks a safe amount correction',t=>{
 
 test('correction that invalidates the refund set succeeds but leaves the relation for review',t=>{
  const x=setup(t),before=x.snapshot();
- const plan=planTransactionCorrection({transactionId:'buy',replacement:replacement(2000),expectedSnapshot:correctionSnapshot(before.entities,'buy'),sourceId:'audit',correctedAt:'2026-10-02T00:00:00Z'},before);
+ const plan=planTransactionCorrection({transactionId:'buy',replacement:replacement(2000),expectedSnapshot:correctionSnapshot(before.entities,'buy'),correctedAt:'2026-10-02T00:00:00Z'},before);
  assert.deepEqual(plan.relationReviewIds,['refund']);assert.deepEqual(plan.relinkedReturnIds,[]);
  x.service.executeBatch(plan.commands);
  assert.equal(x.a.store.get('transactions','buy')?.fields.display_amount,2000);
@@ -38,19 +38,28 @@ test('correction that invalidates the refund set succeeds but leaves the relatio
 
 test('category correction revalidates relation and moves refund reduction with the original category',t=>{
  const x=setup(t),before=x.snapshot();
- const plan=planTransactionCorrection({transactionId:'buy',replacement:replacement(10000,buyAt,'工作餐'),expectedSnapshot:correctionSnapshot(before.entities,'buy'),sourceId:'audit',correctedAt:'2026-10-02T00:00:00Z'},before);
+ const plan=planTransactionCorrection({transactionId:'buy',replacement:replacement(10000,buyAt,'工作餐'),expectedSnapshot:correctionSnapshot(before.entities,'buy'),correctedAt:'2026-10-02T00:00:00Z'},before);
  x.service.executeBatch(plan.commands);
  assert.deepEqual(plan.relationReviewIds,[]);assert.equal(x.a.store.get('consumption_effects','buy:effect')?.fields.category_id,'工作餐');assert.equal(x.a.store.get('consumption_effects','refund:effect')?.fields.category_id,'工作餐');
 });
 
 test('moving original after its refund detaches relation instead of rejecting the whole correction',t=>{
  const x=setup(t),before=x.snapshot();
- const plan=planTransactionCorrection({transactionId:'buy',replacement:replacement(10000,'2026-09-25T10:00:00Z'),expectedSnapshot:correctionSnapshot(before.entities,'buy'),sourceId:'audit',correctedAt:'2026-10-02T00:00:00Z'},before);
+ const plan=planTransactionCorrection({transactionId:'buy',replacement:replacement(10000,'2026-09-25T10:00:00Z'),expectedSnapshot:correctionSnapshot(before.entities,'buy'),correctedAt:'2026-10-02T00:00:00Z'},before);
  assert.deepEqual(plan.relationReviewIds,['refund']);x.service.executeBatch(plan.commands);
  assert.equal(x.a.store.get('transactions','buy')?.fields.occurred_at,'2026-09-25T10:00:00Z');
 });
 
 test('stale user snapshot is rejected before any relation lifecycle plan is created',t=>{
  const x=setup(t),before=x.snapshot();
- assert.throws(()=>planTransactionCorrection({transactionId:'buy',replacement:replacement(12000),expectedSnapshot:'[]',sourceId:'audit',correctedAt:'2026-10-02T00:00:00Z'},before),/STALE_TRANSACTION/);
+ assert.throws(()=>planTransactionCorrection({transactionId:'buy',replacement:replacement(12000),expectedSnapshot:'[]',correctedAt:'2026-10-02T00:00:00Z'},before),/STALE_TRANSACTION/);
+});
+
+
+test('ordinary correction does not manufacture a new SourceRecord',t=>{
+ const x=setup(t),before=x.snapshot(),sourcesBefore=before.entities.filter(e=>e.type==='source_records').length;
+ const plan=planTransactionCorrection({transactionId:'buy',replacement:replacement(11000),expectedSnapshot:correctionSnapshot(before.entities,'buy'),correctedAt:'2026-10-02T00:00:00Z'},before);
+ x.service.executeBatch(plan.commands);
+ assert.equal(x.snapshot().entities.filter(e=>e.type==='source_records').length,sourcesBefore);
+ assert.equal(x.a.store.get('transactions','buy')?.fields.display_amount,11000);
 });
