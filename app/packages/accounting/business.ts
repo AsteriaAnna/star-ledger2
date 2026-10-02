@@ -51,7 +51,7 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
  const commands:Command[]=[];
  if(c.kind==='CORRECT_TRANSACTION'||c.kind==='CORRECT_IMPORTED_EVENT') {
   const t=get('transactions',c.transactionId);if(!t||t.fields.deleted_at)throw Error('TRANSACTION_UNAVAILABLE');
-  assertClear('transactions',t.id);timestamp(c.correctedAt);identifier(c.sourceId);
+  assertClear('transactions',t.id);timestamp(c.correctedAt);if(c.kind==='CORRECT_IMPORTED_EVENT')identifier(c.sourceId);
   if(correctionSnapshot(entities,t.id)!==c.expectedSnapshot)throw Error('STALE_TRANSACTION');
   if(c.replacement.id!==t.id||!['SUCCESS','FAILED'].includes(c.replacement.status||'SUCCESS'))throw Error('INVALID_CORRECTION');
   if(entities.some(e=>e.type==='transaction_links'&&!e.fields.deleted_at&&(e.fields.from_transaction_id===t.id||e.fields.to_transaction_id===t.id)))throw Error('ACTIVE_RETURN_LINKS');
@@ -62,7 +62,7 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
   for(const m of entities.filter(e=>e.type==='balance_movements'&&e.fields.transaction_id===t.id&&e.fields.amount!==0))result.push({action:'PATCH_FIELD',entity:{type:m.type,id:m.id,fields:{amount:0}}});
   const postings:Entity[]=[];let index=0;
   for(const cmd of generated.filter(cmd=>!['transactions','source_records'].includes(cmd.entity.type))){
-   if(cmd.entity.type==='balance_movements'){const entity={...cmd.entity,id:t.id+':correction:'+c.sourceId+':'+index++};result.push(create(entity));postings.push(entity);}
+   if(cmd.entity.type==='balance_movements'){const entity={...cmd.entity,id:t.id+':correction:'+c.correctedAt+':'+index++};result.push(create(entity));postings.push(entity);}
    else if(cmd.entity.type==='consumption_effects'){
     const old=get(cmd.entity.type,cmd.entity.id);postings.push(cmd.entity);
     if(!old)result.push(cmd);else for(const key of ['amount','category_id','effective_at'])if(old.fields[key]!==cmd.entity.fields[key])result.push({action:'PATCH_FIELD',entity:{type:old.type,id:old.id,fields:{[key]:cmd.entity.fields[key]}}});
@@ -70,7 +70,7 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
   }
   if(!generated.some(cmd=>cmd.entity.type==='consumption_effects'))for(const e of entities.filter(e=>e.type==='consumption_effects'&&e.fields.transaction_id===t.id&&e.fields.amount!==0))result.push({action:'PATCH_FIELD',entity:{type:e.type,id:e.id,fields:{amount:0}}});
   result.push({action:'PATCH_FIELD',entity:{type:'transactions',id:t.id,fields:{posting_plan:JSON.stringify(postings)}}});
-  result.push(create({type:'source_records',id:c.sourceId,fields:{transaction_id:t.id,source_type:'MANUAL',platform:c.kind==='CORRECT_TRANSACTION'?'星账 · 账单修改':'星账 · 导入修正',created_at:c.correctedAt,raw_payload:JSON.stringify({kind:c.kind==='CORRECT_TRANSACTION'?'TRANSACTION_CORRECTION':'IMPORT_CORRECTION',before:JSON.parse(c.expectedSnapshot),after:postings,event:proposed.fields,evidence:c.replacement.source?.rawPayload||null})}}));
+  if(c.kind==='CORRECT_IMPORTED_EVENT')result.push(create({type:'source_records',id:c.sourceId,fields:{transaction_id:t.id,source_type:'MANUAL',platform:'星账 · 导入修正',created_at:c.correctedAt,raw_payload:JSON.stringify({kind:'IMPORT_CORRECTION',before:JSON.parse(c.expectedSnapshot),after:postings,event:proposed.fields,evidence:c.replacement.source?.rawPayload||null})}}));
   return result;
  }
  if(c.kind==='UNLINK_RETURN') {
