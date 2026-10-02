@@ -51,7 +51,7 @@ export function buildImportedLedgerIntent(input:LedgerIntentBuildInput):LedgerIn
  const originalId=resolved.relation?.state==='RESOLVED'?resolved.relation.originalId:null;
 
  switch(interpretation.eventKind){
-  case 'PURCHASE':return {...base,kind:'PURCHASE',payer:sponsored?null:primary,funding:sponsored?'EXTERNAL_SPONSOR':'OWN'};
+  case 'PURCHASE':return {...base,kind:'PURCHASE',payer:sponsored?null:primary,categoryId:interpretation.categorySuggestion??undefined,funding:sponsored?'EXTERNAL_SPONSOR':'OWN'};
   case 'INCOME':case 'TRANSFER_IN':return {...base,kind:interpretation.eventKind,destination:primary};
   case 'INTERNAL_TRANSFER':return {...base,kind:'INTERNAL_TRANSFER',from:primary,to:null};
   case 'WITHDRAWAL':{

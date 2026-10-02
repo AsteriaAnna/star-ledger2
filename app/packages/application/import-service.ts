@@ -1,3 +1,5 @@
+import {applyCommands,interpret} from '../accounting/business.ts';
+import {buildImportedLedgerIntent} from './import-ledger-intent.ts';
 import type {LedgerSnapshot} from '../accounting/index.ts';
 import {findSourceMatch} from '../importing/dedup.ts';
 import {createAttention,summarizeSession} from '../importing/attention.ts';
@@ -89,13 +91,16 @@ export class ImportStatementService {
   const allAttention:AttentionItem[]=[];
   const resolved:ResolvedImportRecord[]=[];
 
-  for(const prepared of input.prepared.records){
+  let working=input.ledger;
+  // Stage originals before returns, independent of source-file row order.
+  const ordered=[...input.prepared.records].sort((a,b)=>Number(['REFUND','RETURN'].includes(a.interpretation.eventKind))-Number(['REFUND','RETURN'].includes(b.interpretation.eventKind)));
+  for(const prepared of ordered){
    const source=byRecord.get(prepared.externalRecordId);
    if(!source)throw Error('MISSING_EXTERNAL_RECORD');
    const baseAttention=[...prepared.attention];
-   if(prepared.disposition!=='INTERPRETED'){
+   if(!['INTERPRETED','REVIVE_EXISTING'].includes(prepared.disposition)||prepared.attention.some(item=>item.blocking)){
     allAttention.push(...baseAttention);
-    resolved.push({...prepared,ledgerState:['NEEDS_ATTENTION','SOURCE_UPDATE'].includes(prepared.disposition)?'NEEDS_ATTENTION':'NOT_APPLICABLE',account:null,relation:null});
+    resolved.push({...prepared,ledgerState:baseAttention.some(item=>item.blocking)||['NEEDS_ATTENTION','SOURCE_UPDATE'].includes(prepared.disposition)?'NEEDS_ATTENTION':'NOT_APPLICABLE',account:null,relation:null});
     continue;
    }
 
@@ -107,7 +112,7 @@ export class ImportStatementService {
      kind:interpretation.eventKind,amountFen:interpretation.amountFen,occurredAt:interpretation.occurredAt,
      platform:source.platformRaw,profile:source.profile,displayName:interpretation.displayName,
      originalOrderId:source.facts.originalOrderId,orderId:source.facts.orderId,statusRaw:source.facts.statusRaw,productRaw:source.facts.productRaw
-    },input.ledger.entities);
+    },working.entities);
    }
 
    let account:AccountResolution|null=null;
@@ -116,12 +121,12 @@ export class ImportStatementService {
     account=await this.resolveFundingAccount({
      eventKind:interpretation.eventKind,sourceSystem:source.sourceSystem,platform:source.platformRaw,profile:source.profile,
      channelRaw:source.facts.channelRaw,role:'ACCOUNT',sponsored
-    },input.ledger);
+    },working);
    }
 
    const items=[...baseAttention];
    const accountCandidates=(account?.candidates??[]).map(id=>{
-    const entity=input.ledger.entities.find(e=>e.type==='accounts'&&e.id===id);
+    const entity=working.entities.find(e=>e.type==='accounts'&&e.id===id);
     return {id,label:String(entity?.fields.name||id)};
    });
    if(account?.state==='SPLIT')items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'SPLIT_PAYMENT',question:'这笔记录使用了多个资金账户，需要确认资金如何分摊',blocking:true,candidates:accountCandidates,createdAt:input.now}));
@@ -140,20 +145,20 @@ export class ImportStatementService {
    }
 
    if(relation?.state==='RESOLVED'&&relation.originalId&&interpretation.amountFen!==null){
-    const original=input.ledger.entities.find(e=>e.type==='transactions'&&e.id===relation!.originalId)!;
-    const originalEffect=input.ledger.entities.find(e=>e.type==='consumption_effects'&&e.fields.transaction_id===original.id);
-    const previousLinks=input.ledger.entities.filter(e=>e.type==='transaction_links'&&!e.fields.deleted_at&&e.fields.to_transaction_id===original.id);
-    const previous=previousLinks.map(link=>input.ledger.entities.find(e=>e.type==='transactions'&&e.id===link.fields.from_transaction_id))
+    const original=working.entities.find(e=>e.type==='transactions'&&e.id===relation!.originalId)!;
+    const originalEffect=working.entities.find(e=>e.type==='consumption_effects'&&e.fields.transaction_id===original.id);
+    const previousLinks=working.entities.filter(e=>e.type==='transaction_links'&&!e.fields.deleted_at&&e.fields.to_transaction_id===original.id);
+    const previous=previousLinks.map(link=>working.entities.find(e=>e.type==='transactions'&&e.id===link.fields.from_transaction_id))
      .filter((value):value is NonNullable<typeof value>=>!!value&&!value.fields.deleted_at&&value.fields.status==='SUCCESS');
     const previousReturned=previous.reduce((sum,value)=>sum+Number(value.fields.display_amount),0);
-    const previousReduction=-previous.reduce((sum,value)=>sum+Number(input.ledger.entities.find(e=>e.type==='consumption_effects'&&e.fields.transaction_id===value.id)?.fields.amount??0),0);
+    const previousReduction=-previous.reduce((sum,value)=>sum+Number(working.entities.find(e=>e.type==='consumption_effects'&&e.fields.transaction_id===value.id)?.fields.amount??0),0);
     const allocation=resolveReturnAllocation({originalAmount:Number(original.fields.display_amount),originalConsumption:Number(originalEffect?.fields.amount??0),previousReturned,previousReduction,amount:interpretation.amountFen});
     if(allocation.state==='NEEDS_ALLOCATION')items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'CONSUMPTION_ALLOCATION',question:allocation.reason,blocking:true,candidates:[],createdAt:input.now}));
    }
 
    if(relation?.state==='SUGGESTED'){
     const candidates=relation.candidates.map(id=>{
-     const entity=input.ledger.entities.find(e=>e.type==='transactions'&&e.id===id);
+     const entity=working.entities.find(e=>e.type==='transactions'&&e.id===id);
      return {id,label:String(entity?.fields.display_name||id),detail:entity?String(entity.fields.occurred_at):undefined};
     });
     items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'REFUND_RELATION',question:relation.reason,blocking:false,candidates,createdAt:input.now}));
@@ -165,7 +170,12 @@ export class ImportStatementService {
    }
 
    allAttention.push(...items);
-   resolved.push({...prepared,ledgerState:items.some(item=>item.blocking)?'NEEDS_ATTENTION':'READY_FOR_LEDGER',account,relation,attention:items});
+   const value:ResolvedImportRecord={...prepared,ledgerState:items.some(item=>item.blocking)?'NEEDS_ATTENTION':'READY_FOR_LEDGER',account,relation,attention:items};
+   resolved.push(value);
+   if(value.disposition==='INTERPRETED'&&value.ledgerState==='READY_FOR_LEDGER'){
+    const intent=buildImportedLedgerIntent({resolved:value,source});
+    working=applyCommands(working,interpret(intent,working));
+   }
   }
 
   const session=summarizeSession({...input.prepared.session,updatedAt:input.now},allAttention,input.now);
@@ -225,7 +235,9 @@ export class ImportStatementService {
     allAttention.push(...items);prepared.push({externalRecordId:record.id,disposition:'NEEDS_ATTENTION',transactionId:null,interpretation,attention:items});continue;
    }
    if(sourceMatch.deletedTransactionIds.length===1){
-    prepared.push({externalRecordId:record.id,disposition:'REVIVE_EXISTING',transactionId:sourceMatch.deletedTransactionIds[0],interpretation,attention:[]});continue;
+    const items=validateInterpretation(input.sessionId,record,interpretation,input.now);
+    allAttention.push(...items);
+    prepared.push({externalRecordId:record.id,disposition:'REVIVE_EXISTING',transactionId:sourceMatch.deletedTransactionIds[0],interpretation,attention:items});continue;
    }
    if(sourceMatch.deletedTransactionIds.length>1){
     const items=[createAttention({sessionId:input.sessionId,externalRecordId:record.id,kind:'POSSIBLE_DUPLICATE',question:'同一来源对应多笔回收站记录，需要确认恢复哪一笔',blocking:true,candidates:sourceMatch.deletedTransactionIds.map(id=>({id,label:id})),createdAt:input.now})];

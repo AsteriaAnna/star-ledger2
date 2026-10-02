@@ -21,7 +21,7 @@ test('ready purchase with unknown account creates unresolved movement rather tha
  assert.equal(out.record.ledgerState,'READY_FOR_LEDGER');
  const intent=buildImportedLedgerIntent({resolved:out.record,source:r});
  assert.equal(intent.kind,'PURCHASE');if(intent.kind!=='PURCHASE')return;
- assert.equal(intent.payer,null);assert.equal(intent.funding,'OWN');assert.equal(intent.categoryId,undefined);
+ assert.equal(intent.payer,null);assert.equal(intent.funding,'OWN');assert.equal(intent.categoryId,'购物');
  const commands=interpret(intent,out.ledger);
  const movement=commands.find(x=>x.entity.type==='balance_movements')!.entity;
  assert.equal(movement.fields.account_id,null);

@@ -29,7 +29,7 @@ function mappingCommand(entities:Entity[],id:string,payload:unknown):Command{
  const value=JSON.stringify(payload);
  return old?{action:'PATCH_FIELD',entity:{type:'import_rules',id,fields:{value}}}:{action:'CREATE_ENTITY',entity:{type:'import_rules',id,fields:{rule_key:id,value}}};
 }
-export const rememberAccountMappingCommand=(entities:Entity[],key:AccountIdentity,mapping:AccountMapping)=>mappingCommand(entities,accountMappingKey(key),mapping);
+export const rememberAccountMappingCommand=(entities:Entity[],key:AccountIdentity,mapping:AccountMapping)=>mappingCommand(entities,accountMappingKey(key),{...mapping,identity:key});
 export const rememberMerchantCategoryCommand=(entities:Entity[],key:MerchantIdentity,mapping:CategoryMapping)=>mappingCommand(entities,merchantCategoryKey(key),mapping);
 
 
