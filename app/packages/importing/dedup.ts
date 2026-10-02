@@ -20,7 +20,7 @@ export function findSourceMatch(identity:SourceIdentity,entities:Entity[]):Sourc
   const payload=json(source.fields.raw_payload);if(!payload)continue;
   if(payload.identity===identity.value&&source.fields.platform===identity.platform&&(payload.profile?payload.profile===identity.profile:identity.profile==='本人')){ids.add(String(source.fields.transaction_id));matchedBy.add('SOURCE_IDENTITY');continue;}
   if(identity.profile==='本人'&&source.id==='source-'+identity.value){ids.add(String(source.fields.transaction_id));matchedBy.add('LEGACY_SOURCE_ID');continue;}
-  if(identity.orderId&&payload.order===identity.orderId&&source.fields.platform===identity.platform&&(!payload.profile||payload.profile===identity.profile)){
+  if(identity.orderId&&payload.order===identity.orderId&&source.fields.platform===identity.platform&&(payload.profile?payload.profile===identity.profile:identity.profile==='本人')){
    ids.add(String(source.fields.transaction_id));matchedBy.add('LEGACY_ORDER');
   }
  }
