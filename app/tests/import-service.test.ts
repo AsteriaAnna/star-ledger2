@@ -4,6 +4,7 @@ import type {Entity} from '../packages/domain/index.ts';
 import {ImportStatementService} from '../packages/application/import-service.ts';
 import {InMemoryImportWorkspace} from '../packages/importing/workspace.ts';
 import type {EventInterpretation,ExternalRecord} from '../packages/importing/types.ts';
+import type {AccountIdentity,AccountMapping,CategoryMapping,MerchantIdentity,ResolutionMemoryRepository} from '../packages/application/ports.ts';
 
 const record=(id:string):ExternalRecord=>({id,sessionId:'s',sourceIdentity:id,sourceType:'EXCEL',sourceSystem:'ALIPAY',platformRaw:'支付宝',profile:'本人',rawPayload:'{}',parserVersion:3,capturedAt:'2026-10-02T00:00:00Z',facts:{occurredAt:'2026-09-20T04:00:00Z',amountFen:1000,transactionTypeRaw:'消费',directionRaw:'支出',statusRaw:'交易成功',channelRaw:'余额',counterpartyRaw:'商户',productRaw:'商品',noteRaw:'',sourceCategoryRaw:'',orderId:id,refundId:null,originalOrderId:null,precision:'second'}});
 const interpretation=(id:string,patch:Partial<EventInterpretation>={}):EventInterpretation=>({externalRecordId:id,eventKind:'PURCHASE',status:'SUCCESS',amountFen:1000,occurredAt:'2026-09-20T04:00:00Z',displayName:'商品',channelRaw:'余额',categorySuggestion:'购物',evidence:[],...patch});
@@ -42,4 +43,32 @@ test('non-duplicate deterministic source becomes ready without workflow confirma
  const workspace=new InMemoryImportWorkspace(),service=new ImportStatementService(workspace),r=record('ready');
  const result=await service.prepare({sessionId:'s',sourceType:'EXCEL',sourceSystem:'ALIPAY',records:[r],interpretations:[interpretation(r.id)],ledger:{entities:[],conflicts:[]},now:'2026-10-02T00:00:00Z'});
  assert.equal(result.records[0].disposition,'INTERPRETED');assert.deepEqual(result.records[0].attention,[]);
+});
+
+class MemoryRepo implements ResolutionMemoryRepository{
+ account=new Map<string,AccountMapping>();
+ key(v:AccountIdentity){return JSON.stringify(v);}
+ async findAccountMapping(v:AccountIdentity){return this.account.get(this.key(v))??null;}
+ async rememberAccountMapping(v:AccountIdentity,m:AccountMapping){this.account.set(this.key(v),m);}
+ async findMerchantCategory(_v:MerchantIdentity):Promise<CategoryMapping|null>{return null;}
+ async rememberMerchantCategory(_v:MerchantIdentity,_m:CategoryMapping):Promise<void>{}
+}
+const account=(id:string,name:string):Entity=>({type:'accounts',id,fields:{name,type:'ASSET',last4:'',deleted_at:null,balance_tracking:'ENABLED',balance_state:'ESTABLISHED',opening_balance:0,opening_balance_at:'2026-01-01T00:00:00Z'}});
+
+test('import service uses memory only after deterministic account resolution cannot decide',async()=>{
+ const memories=new MemoryRepo(),service=new ImportStatementService(new InMemoryImportWorkspace(),memories);
+ const ledger={entities:[account('a1','自定义一'),account('a2','自定义二')],conflicts:[]};
+ const request={eventKind:'PURCHASE',platform:'支付宝',profile:'本人',channelRaw:'余额',role:'ACCOUNT' as const,sponsored:false};
+ let result=await service.resolveFundingAccount(request,ledger);assert.equal(result.state,'UNRESOLVED');
+ await service.rememberFundingAccount(request,'a2',ledger,'2026-10-02T00:00:00Z');
+ result=await service.resolveFundingAccount(request,ledger);assert.equal(result.state,'RESOLVED');assert.equal(result.accountId,'a2');
+});
+
+test('deterministic unique account outranks stale remembered mapping',async()=>{
+ const memories=new MemoryRepo(),service=new ImportStatementService(new InMemoryImportWorkspace(),memories);
+ const request={eventKind:'PURCHASE',platform:'支付宝',profile:'本人',channelRaw:'余额',role:'ACCOUNT' as const,sponsored:false};
+ const before={entities:[account('old','旧账户')],conflicts:[]};
+ await service.rememberFundingAccount(request,'old',before,'2026-10-01T00:00:00Z');
+ const ledger={entities:[account('old','旧账户'),account('wallet','支付宝余额')],conflicts:[]};
+ const result=await service.resolveFundingAccount(request,ledger);assert.equal(result.accountId,'wallet');assert.equal(result.reason,'按明确资金渠道唯一匹配');
 });
