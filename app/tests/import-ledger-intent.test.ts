@@ -35,7 +35,7 @@ test('ordinary external transfer remains zero consumption in ledger intent',asyn
  assert.equal(intent.consumptionAmount,0);
 });
 
-test('import identity generates stable transaction id and immutable source evidence id',async()=>{
+test('import identity generates stable transaction id while source evidence id remains caller-owned',async()=>{
  const r=record('stable-source'),out=await resolve(r,interpretation(r.id)),intent=buildImportedLedgerIntent({resolved:out.record,source:r,sourceRecordId:'evidence-'+r.id});
  assert.equal(intent.id,importedTransactionId(r));assert.equal(intent.source?.id,'evidence-stable-source');
  const payload=JSON.parse(intent.source!.rawPayload);assert.equal(payload.identity,'stable-source');assert.equal(payload.version,3);
