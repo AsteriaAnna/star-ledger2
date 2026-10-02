@@ -26,7 +26,7 @@ test('deleted source match is distinguishable from active duplicate',()=>{
 });
 
 test('attention summary only blocks completion for blocking questions',()=>{
- const base:ImportSession={id:'s',sourceType:'EXCEL',sourceSystem:'ALIPAY',createdAt:'a',updatedAt:'a',state:'PROCESSING',sourceCount:2,committedCount:1,skippedDuplicateCount:1,blockingAttentionCount:0,nonBlockingAttentionCount:0,failureCode:null};
+ const base:ImportSession={id:'s',sourceType:'EXCEL',sourceSystem:'ALIPAY',createdAt:'a',updatedAt:'a',state:'PROCESSING',sourceCount:2,committedCount:1,skippedDuplicateCount:1,noEffectCount:0,blockingAttentionCount:0,nonBlockingAttentionCount:0,failureCode:null};
  const info:AttentionItem={id:attentionId('s','r','REFUND_RELATION'),sessionId:'s',externalRecordId:'r',kind:'REFUND_RELATION',question:'可关联原消费',blocking:false,candidates:[],createdAt:'a'};
  assert.equal(summarizeSession(base,[info],'b').state,'COMPLETED');
  assert.equal(summarizeSession(base,[{...info,id:attentionId('s','r','AMOUNT'),kind:'AMOUNT',blocking:true}],'b').state,'NEEDS_ATTENTION');
