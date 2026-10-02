@@ -65,10 +65,10 @@ test('strong refund relation may infer original destination without requiring so
  assert.equal(result.records[0].relation?.state,'RESOLVED');assert.equal(result.records[0].relation?.destinationAccountId,'wallet');assert.equal(result.records[0].ledgerState,'READY_FOR_LEDGER');
 });
 
-test('repayment remains blocking until both semantic endpoints are representable',async()=>{
+test('repayment preserves the known event while unresolved liability endpoint becomes non-blocking attention',async()=>{
  const r=record('repay',{facts:{...record('x').facts,transactionTypeRaw:'花呗还款',channelRaw:'招商银行储蓄卡(1234)',orderId:'repay'}});
  const result=await pipeline(r,interpretation(r.id,{eventKind:'REPAYMENT',channelRaw:r.facts.channelRaw}),[account('bank','招商银行卡(1234)','ASSET','1234'),account('huabei','花呗','LIABILITY')]);
- assert.equal(result.records[0].ledgerState,'NEEDS_ATTENTION');assert.equal(result.records[0].attention.find(x=>x.kind==='TRANSFER_ENDPOINTS')?.blocking,true);
+ assert.equal(result.records[0].ledgerState,'READY_FOR_LEDGER');assert.equal(result.records[0].attention.find(x=>x.kind==='TRANSFER_ENDPOINTS')?.blocking,false);
 });
 
 test('strong refund relation still blocks when partial-consumption allocation is genuinely ambiguous',async()=>{
