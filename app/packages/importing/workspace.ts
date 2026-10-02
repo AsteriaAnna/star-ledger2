@@ -1,16 +1,17 @@
-import type {AttentionItem,ExternalRecord,ImportSession} from './types.ts';
+import type {AttentionItem,ExternalRecord,ImportRecordOutcome,ImportSession} from './types.ts';
 import type {ImportWorkspaceRepository} from '../application/ports.ts';
 
 export type ImportWorkspaceSnapshot={
  sessions:Record<string,ImportSession>;
  records:Record<string,ExternalRecord[]>;
  attention:Record<string,AttentionItem[]>;
+ outcomes:Record<string,ImportRecordOutcome[]>;
 };
 
 export class InMemoryImportWorkspace implements ImportWorkspaceRepository {
  private data:ImportWorkspaceSnapshot;
  constructor(seed?:Partial<ImportWorkspaceSnapshot>){
-  this.data={sessions:structuredClone(seed?.sessions??{}),records:structuredClone(seed?.records??{}),attention:structuredClone(seed?.attention??{})};
+  this.data={sessions:structuredClone(seed?.sessions??{}),records:structuredClone(seed?.records??{}),attention:structuredClone(seed?.attention??{}),outcomes:structuredClone(seed?.outcomes??{})};
  }
  async getSession(id:string){return structuredClone(this.data.sessions[id]??null);}
  async listSessions(){return structuredClone(Object.values(this.data.sessions).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)||a.id.localeCompare(b.id)));}
@@ -26,11 +27,13 @@ export class InMemoryImportWorkspace implements ImportWorkspaceRepository {
  }
  async listAttentionItems(sessionId:string){return structuredClone(this.data.attention[sessionId]??[]);}
  async replaceAttentionItems(sessionId:string,items:AttentionItem[]){this.data.attention[sessionId]=structuredClone(items);}
+ async listOutcomes(sessionId:string){return structuredClone(this.data.outcomes[sessionId]??[]);}
+ async replaceOutcomes(sessionId:string,outcomes:ImportRecordOutcome[]){if(outcomes.some(item=>item.sessionId!==sessionId))throw Error('IMPORT_SESSION_MISMATCH');this.data.outcomes[sessionId]=structuredClone(outcomes);}
  async saveSessionSnapshot(session:ImportSession,records:ExternalRecord[],items:AttentionItem[]){
   if(records.some(record=>record.sessionId!==session.id)||items.some(item=>item.sessionId!==session.id))throw Error('IMPORT_SESSION_MISMATCH');
   const next=structuredClone(this.data);next.sessions[session.id]=structuredClone(session);next.records[session.id]=structuredClone(records);next.attention[session.id]=structuredClone(items);this.data=next;
  }
- async clearSession(id:string){delete this.data.sessions[id];delete this.data.records[id];delete this.data.attention[id];}
+ async clearSession(id:string){delete this.data.sessions[id];delete this.data.records[id];delete this.data.attention[id];delete this.data.outcomes[id];}
  snapshot(){return structuredClone(this.data);}
 }
 
@@ -66,6 +69,8 @@ export class LocalImportWorkspace implements ImportWorkspaceRepository {
  async putExternalRecords(records:ExternalRecord[]){await this.memory.putExternalRecords(records);this.persist();}
  async listAttentionItems(sessionId:string){return this.memory.listAttentionItems(sessionId);}
  async replaceAttentionItems(sessionId:string,items:AttentionItem[]){await this.memory.replaceAttentionItems(sessionId,items);this.persist();}
+ async listOutcomes(sessionId:string){return this.memory.listOutcomes(sessionId);}
+ async replaceOutcomes(sessionId:string,outcomes:ImportRecordOutcome[]){await this.memory.replaceOutcomes(sessionId,outcomes);this.persist();}
  async saveSessionSnapshot(session:ImportSession,records:ExternalRecord[],items:AttentionItem[]){
   await this.memory.saveSessionSnapshot(session,records,items);this.persist();
  }
