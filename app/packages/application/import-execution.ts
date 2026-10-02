@@ -3,6 +3,8 @@ import type {LedgerSnapshot} from '../accounting/index.ts';
 import {applyCommands,correctionSnapshot,interpret} from '../accounting/business.ts';
 import {planTransactionCorrection} from './correction-service.ts';
 import type {ImportCommitPlan} from './import-commit.ts';
+import type {AttentionItem,ImportSession} from '../importing/types.ts';
+import {summarizeSession} from '../importing/attention.ts';
 
 export type ImportExecutionPlan={
  commands:BusinessCommand[];
@@ -48,4 +50,10 @@ export function planImportExecution(plan:ImportCommitPlan,snapshot:LedgerSnapsho
   noEffectRecordIds:[...plan.noEffectRecordIds],
   blockedRecordIds:[...plan.blockedRecordIds]
  };
+}
+
+
+export function completeImportSession(session:ImportSession,execution:ImportExecutionPlan,attention:AttentionItem[],now:string):ImportSession{
+ const committed=execution.createdIds.length+execution.revivedIds.length;
+ return summarizeSession({...session,committedCount:committed,skippedDuplicateCount:execution.skippedDuplicateIds.length,noEffectCount:execution.noEffectRecordIds.length},attention,now);
 }
