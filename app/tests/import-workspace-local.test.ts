@@ -29,8 +29,8 @@ test('workspace snapshot ownership fails before persistent state changes',async(
  assert.equal([...storage.data.values()][0],before);
 });
 
-test('corrupt device-local workspace fails open to an empty recovery workspace',async()=>{
+test('corrupt device-local workspace fails closed and preserves recovery bytes',()=>{
  const storage=new MemoryStorage();storage.setItem('star-ledger:v2:import-workspace','{broken');
- const workspace=new LocalImportWorkspace(storage);
- assert.equal(await workspace.getSession('session-1'),null);assert.equal(storage.getItem('star-ledger:v2:import-workspace'),null);
+ assert.throws(()=>new LocalImportWorkspace(storage),/CORRUPT_IMPORT_WORKSPACE/);
+ assert.equal(storage.getItem('star-ledger:v2:import-workspace'),'{broken');
 });
