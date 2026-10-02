@@ -3,6 +3,7 @@ import type {Store,Entity,Operation} from '../domain/index.ts';
 import type {BusinessCommand,AccountRef,EventBase} from '../domain/accounting.ts';
 import {AccountingService} from './index.ts';
 import type {Command,LedgerSnapshot} from './index.ts';
+import {resolveReturnAllocation} from '../domain/return-allocation.ts';
 
 const create=(entity:Entity):Command=>({action:'CREATE_ENTITY',entity});
 function money(value:number,allowZero=false):void {
@@ -276,18 +277,10 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
    if(sum([refunded,c.amount])>(original.fields.display_amount as number))throw Error('RETURN_EXCEEDS_ORIGINAL');
    const originalEffect=get('consumption_effects',`${c.originalId}:effect`);
    const originalConsumption=(originalEffect?.fields.amount as number)??0;
-   let reduction=c.consumptionReduction;
-   if(reduction===undefined) {
-    if(originalConsumption===0)reduction=0;
-    else if(originalConsumption===original.fields.display_amount)reduction=c.amount;
-    else if(c.amount===original.fields.display_amount&&refunded===0)reduction=originalConsumption;
-    else throw Error('CONSUMPTION_ALLOCATION_REQUIRED');
-   }
-   money(reduction,true);
    const previousReduction=-sum(previous.map(t=>(get('consumption_effects',`${t.id}:effect`)?.fields.amount as number)??0));
-   if(reduction>c.amount||sum([previousReduction,reduction])>originalConsumption)throw Error('REFUND_CONSUMPTION_EXCEEDED');
-   const nonConsumed=(original.fields.display_amount as number)-originalConsumption;
-   if(sum([refunded-previousReduction,c.amount-reduction])>nonConsumed)throw Error('REFUND_NONCONSUMPTION_EXCEEDED');
+   const allocation=resolveReturnAllocation({originalAmount:Number(original.fields.display_amount),originalConsumption,previousReturned:refunded,previousReduction,amount:c.amount,requestedReduction:c.consumptionReduction});
+   if(allocation.state==='NEEDS_ALLOCATION')throw Error('CONSUMPTION_ALLOCATION_REQUIRED');
+   const reduction=allocation.reduction;
    const originalMovements=entities.filter(e=>e.type==='balance_movements'&&e.fields.amount!==0&&e.fields.transaction_id===c.originalId);
    if(originalMovements.length===0) {if(c.destination!==null)throw Error('SPONSORED_REFUND_HAS_OWN_ACCOUNT');}
    else movement(c.destination,c.amount);
