@@ -33,7 +33,7 @@ test('attention summary only blocks completion for blocking questions',()=>{
 });
 
 test('import workspace persists processing state without becoming ledger entities',async()=>{
- const repo=new InMemoryImportWorkspace(),session:ImportSession={id:'s',sourceType:'EXCEL',sourceSystem:'WECHAT',createdAt:'a',updatedAt:'a',state:'PROCESSING',sourceCount:0,committedCount:0,skippedDuplicateCount:0,blockingAttentionCount:0,nonBlockingAttentionCount:0,failureCode:null};
+ const repo=new InMemoryImportWorkspace(),session:ImportSession={id:'s',sourceType:'EXCEL',sourceSystem:'WECHAT',createdAt:'a',updatedAt:'a',state:'PROCESSING',sourceCount:0,committedCount:0,skippedDuplicateCount:0,noEffectCount:0,blockingAttentionCount:0,nonBlockingAttentionCount:0,failureCode:null};
  await repo.putSession(session);assert.deepEqual(await repo.getSession('s'),session);
  await repo.clearSession('s');assert.equal(await repo.getSession('s'),null);
 });
