@@ -8,6 +8,7 @@ export type EventBase = {
 };
 export type CreateAccount = { kind:'CREATE_ACCOUNT'; id:string; name:string; accountType:'ASSET'|'LIABILITY';
  openingBalance:number|null; openingBalanceAt:string; tracking?:boolean; last4?:string };
+export type SetBalanceAnchor={kind:'SET_BALANCE_ANCHOR';id:string;accountId:string;observedBalance:number;observedAt:string;sourceType:'MANUAL'|'STATEMENT';createdAt:string};
 export type Purchase = EventBase & {kind:'PURCHASE';amount:number; payer:AccountRef; categoryId?:string;
  funding?:'OWN'|'EXTERNAL_SPONSOR'};
 export type Income = EventBase & {kind:'INCOME'|'TRANSFER_IN';amount:number; destination:AccountRef};
@@ -33,4 +34,4 @@ export type UnlinkReturn = {kind:'UNLINK_RETURN';transactionId:string;detachedAt
 export type CorrectTransaction={kind:'CORRECT_TRANSACTION';transactionId:string;replacement:LedgerIntent;expectedSnapshot:string;correctedAt:string};
 /** @deprecated V1 compatibility only. New application code uses CORRECT_TRANSACTION. */
 export type CorrectImportedEvent={kind:'CORRECT_IMPORTED_EVENT';transactionId:string;replacement:FinancialEvent;expectedSnapshot:string;sourceId:string;correctedAt:string};
-export type BusinessCommand = CorrectTransaction|CorrectImportedEvent|LinkReturn|UnlinkReturn| CorrectAmount| ResolveSettlement| SetStatus|BindAccount| DeleteTransaction| CreateAccount|Purchase|Income|InternalTransfer|Withdrawal|ExternalPayment|Repayment|Refund|Meaning;
+export type BusinessCommand = CorrectTransaction|CorrectImportedEvent|LinkReturn|UnlinkReturn| CorrectAmount|SetBalanceAnchor| ResolveSettlement| SetStatus|BindAccount| DeleteTransaction| CreateAccount|Purchase|Income|InternalTransfer|Withdrawal|ExternalPayment|Repayment|Refund|Meaning;
