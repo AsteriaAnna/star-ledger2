@@ -6,6 +6,7 @@ import type {ImportWorkspaceRepository,ResolutionMemoryRepository} from './ports
 import {resolveAccount,type AccountResolution,type AccountResolutionRequest} from '../importing/account-resolution.ts';
 import {resolveRefundRelation,type RefundRelationResolution} from '../importing/relation-resolution.ts';
 import {emptyChannel} from '../importing/channel.ts';
+import {resolveReturnAllocation} from '../domain/return-allocation.ts';
 
 export type ImportDisposition='INTERPRETED'|'NO_EFFECT'|'SKIP_DUPLICATE'|'REVIVE_EXISTING'|'NEEDS_ATTENTION';
 
@@ -132,6 +133,18 @@ export class ImportStatementService {
     items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'TRANSFER_ENDPOINTS',question:'还款需要确认转出资产账户和还款的负债账户',blocking:true,candidates:accountCandidates,createdAt:input.now}));
    }else if(['INTERNAL_TRANSFER','WITHDRAWAL'].includes(interpretation.eventKind)){
     items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'TRANSFER_ENDPOINTS',question:'已记录资金变化，另一端账户仍待补充',blocking:false,candidates:[],createdAt:input.now}));
+   }
+
+   if(relation?.state==='RESOLVED'&&relation.originalId&&interpretation.amountFen!==null){
+    const original=input.ledger.entities.find(e=>e.type==='transactions'&&e.id===relation!.originalId)!;
+    const originalEffect=input.ledger.entities.find(e=>e.type==='consumption_effects'&&e.fields.transaction_id===original.id);
+    const previousLinks=input.ledger.entities.filter(e=>e.type==='transaction_links'&&e.fields.to_transaction_id===original.id);
+    const previous=previousLinks.map(link=>input.ledger.entities.find(e=>e.type==='transactions'&&e.id===link.fields.from_transaction_id))
+     .filter((value):value is NonNullable<typeof value>=>!!value&&!value.fields.deleted_at&&value.fields.status==='SUCCESS');
+    const previousReturned=previous.reduce((sum,value)=>sum+Number(value.fields.display_amount),0);
+    const previousReduction=-previous.reduce((sum,value)=>sum+Number(input.ledger.entities.find(e=>e.type==='consumption_effects'&&e.fields.transaction_id===value.id)?.fields.amount??0),0);
+    const allocation=resolveReturnAllocation({originalAmount:Number(original.fields.display_amount),originalConsumption:Number(originalEffect?.fields.amount??0),previousReturned,previousReduction,amount:interpretation.amountFen});
+    if(allocation.state==='NEEDS_ALLOCATION')items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'CONSUMPTION_ALLOCATION',question:allocation.reason,blocking:true,candidates:[],createdAt:input.now}));
    }
 
    if(relation?.state==='SUGGESTED'){
