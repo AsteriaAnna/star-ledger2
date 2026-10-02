@@ -48,7 +48,10 @@ export interface WorkspaceStorage {
  */
 export class LocalImportWorkspace implements ImportWorkspaceRepository {
  private readonly memory:InMemoryImportWorkspace;
- constructor(private readonly storage:WorkspaceStorage,private readonly key='star-ledger:v2:import-workspace'){
+ private readonly storage:WorkspaceStorage;
+ private readonly key:string;
+ constructor(storage:WorkspaceStorage,key='star-ledger:v2:import-workspace'){
+  this.storage=storage;this.key=key;
   let seed:ImportWorkspaceSnapshot|undefined;
   const raw=storage.getItem(key);
   if(raw){try{seed=JSON.parse(raw) as ImportWorkspaceSnapshot;}catch{throw Error('CORRUPT_IMPORT_WORKSPACE');}}
