@@ -4,7 +4,7 @@ import {attentionId,assertAttentionItem,summarizeSession} from '../importing/att
 import type {AttentionItem,EventInterpretation,ExternalRecord,ImportSession,ImportSourceType,SourceSystem} from '../importing/types.ts';
 import type {ImportWorkspaceRepository} from './ports.ts';
 
-export type ImportDisposition='READY'|'NO_EFFECT'|'SKIP_DUPLICATE'|'REVIVE_EXISTING'|'NEEDS_ATTENTION';
+export type ImportDisposition='INTERPRETED'|'NO_EFFECT'|'SKIP_DUPLICATE'|'REVIVE_EXISTING'|'NEEDS_ATTENTION';
 
 export type PreparedImportRecord={
  externalRecordId:string;
@@ -56,14 +56,14 @@ export class ImportStatementService {
   const base:ImportSession=existing??{
    id:input.sessionId,sourceType:input.sourceType,sourceSystem:input.sourceSystem,
    createdAt:input.now,updatedAt:input.now,state:'PROCESSING',sourceCount:input.records.length,
-   committedCount:0,skippedDuplicateCount:0,blockingAttentionCount:0,nonBlockingAttentionCount:0,failureCode:null
+   committedCount:0,skippedDuplicateCount:0,noEffectCount:0,blockingAttentionCount:0,nonBlockingAttentionCount:0,failureCode:null
   };
   if(base.sourceType!==input.sourceType||base.sourceSystem!==input.sourceSystem)throw Error('IMPORT_SESSION_SOURCE_MISMATCH');
 
   await this.workspace.putExternalRecords(input.records);
   const prepared:PreparedImportRecord[]=[];
   const allAttention:AttentionItem[]=[];
-  let skippedDuplicateCount=0;
+  let skippedDuplicateCount=0,noEffectCount=0;
 
   for(const record of input.records){
    const interpretation=byRecord.get(record.id);
@@ -95,15 +95,16 @@ export class ImportStatementService {
    }
 
    if(interpretation.status==='FAILED'){
+    noEffectCount++;
     prepared.push({externalRecordId:record.id,disposition:'NO_EFFECT',transactionId:null,interpretation,attention:[]});continue;
    }
 
    const items=validateInterpretation(input.sessionId,record,interpretation,input.now);
    allAttention.push(...items);
-   prepared.push({externalRecordId:record.id,disposition:items.length?'NEEDS_ATTENTION':'READY',transactionId:null,interpretation,attention:items});
+   prepared.push({externalRecordId:record.id,disposition:items.length?'NEEDS_ATTENTION':'INTERPRETED',transactionId:null,interpretation,attention:items});
   }
 
-  const session=summarizeSession({...base,sourceCount:input.records.length,skippedDuplicateCount,updatedAt:input.now},allAttention,input.now);
+  const session=summarizeSession({...base,sourceCount:input.records.length,skippedDuplicateCount,noEffectCount,updatedAt:input.now},allAttention,input.now);
   await this.workspace.replaceAttentionItems(input.sessionId,allAttention);
   await this.workspace.putSession(session);
   return {session,records:prepared};
