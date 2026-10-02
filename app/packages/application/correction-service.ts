@@ -47,7 +47,7 @@ export function planTransactionCorrection(request:CorrectionRequest,snapshot:Led
  }
 
  const correction:BusinessCommand={
-  kind:'CORRECT_IMPORTED_EVENT',transactionId:request.transactionId,
+  kind:'CORRECT_TRANSACTION',transactionId:request.transactionId,
   replacement:unlinkedReplacement(request.replacement),
   expectedSnapshot:correctionSnapshot(working.entities,request.transactionId),
   sourceId:request.sourceId,correctedAt:request.correctedAt
