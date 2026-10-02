@@ -142,7 +142,7 @@ export class ImportStatementService {
    if(relation?.state==='RESOLVED'&&relation.originalId&&interpretation.amountFen!==null){
     const original=input.ledger.entities.find(e=>e.type==='transactions'&&e.id===relation!.originalId)!;
     const originalEffect=input.ledger.entities.find(e=>e.type==='consumption_effects'&&e.fields.transaction_id===original.id);
-    const previousLinks=input.ledger.entities.filter(e=>e.type==='transaction_links'&&e.fields.to_transaction_id===original.id);
+    const previousLinks=input.ledger.entities.filter(e=>e.type==='transaction_links'&&!e.fields.deleted_at&&e.fields.to_transaction_id===original.id);
     const previous=previousLinks.map(link=>input.ledger.entities.find(e=>e.type==='transactions'&&e.id===link.fields.from_transaction_id))
      .filter((value):value is NonNullable<typeof value>=>!!value&&!value.fields.deleted_at&&value.fields.status==='SUCCESS');
     const previousReturned=previous.reduce((sum,value)=>sum+Number(value.fields.display_amount),0);
