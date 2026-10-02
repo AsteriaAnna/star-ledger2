@@ -72,3 +72,19 @@ test('deterministic unique account outranks stale remembered mapping',async()=>{
  const ledger={entities:[account('old','旧账户'),account('wallet','支付宝余额')],conflicts:[]};
  const result=await service.resolveFundingAccount(request,ledger);assert.equal(result.accountId,'wallet');assert.equal(result.reason,'按明确资金渠道唯一匹配');
 });
+
+
+test('same source identity with changed official evidence is not silently skipped as duplicate',async()=>{
+ const workspace=new InMemoryImportWorkspace(),service=new ImportStatementService(workspace),r={...record('source-1'),rawPayload:'raw-v2'};
+ const entities:Entity[]=[transaction('t1'),{type:'source_records',id:'sr-v1',fields:{transaction_id:'t1',source_type:'EXCEL',platform:'支付宝',raw_payload:JSON.stringify({version:3,identity:'source-1',profile:'本人',order:'source-1',original:'raw-v1'}),created_at:'2026-09-20T04:00:00Z'}}];
+ const result=await service.prepare({sessionId:'s',sourceType:'EXCEL',sourceSystem:'ALIPAY',records:[r],interpretations:[interpretation(r.id)],ledger:{entities,conflicts:[]},now:'2026-10-02T00:00:00Z'});
+ assert.equal(result.records[0].disposition,'SOURCE_UPDATE');assert.equal(result.records[0].transactionId,'t1');
+ assert.equal(result.records[0].attention[0].kind,'SOURCE_UPDATE');assert.equal(result.records[0].attention[0].blocking,true);
+});
+
+test('same source identity with the same V3 evidence remains an exact idempotent replay',async()=>{
+ const workspace=new InMemoryImportWorkspace(),service=new ImportStatementService(workspace),r={...record('source-1'),rawPayload:'same-raw'};
+ const entities:Entity[]=[transaction('t1'),{type:'source_records',id:'sr',fields:{transaction_id:'t1',source_type:'EXCEL',platform:'支付宝',raw_payload:JSON.stringify({version:3,identity:'source-1',profile:'本人',order:'source-1',original:'same-raw'}),created_at:'2026-09-20T04:00:00Z'}}];
+ const result=await service.prepare({sessionId:'s',sourceType:'EXCEL',sourceSystem:'ALIPAY',records:[r],interpretations:[interpretation(r.id)],ledger:{entities,conflicts:[]},now:'2026-10-02T00:00:00Z'});
+ assert.equal(result.records[0].disposition,'SKIP_DUPLICATE');assert.equal(result.session.skippedDuplicateCount,1);
+});
