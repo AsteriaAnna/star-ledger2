@@ -60,8 +60,9 @@ export class ImportStatementService {
   if(!this.memories)throw Error('RESOLUTION_MEMORY_UNAVAILABLE');
   const resolution=resolveAccount({...request,rememberedAccountId:null},ledger.entities,ledger.conflicts);
   if(!resolution.memoryKey)throw Error('ACCOUNT_MEMORY_NOT_APPLICABLE');
-  const account=ledger.entities.find(e=>e.type==='accounts'&&e.id===accountId&&!e.fields.deleted_at);
-  if(!account)throw Error('ACCOUNT_UNAVAILABLE');
+  if(resolution.state==='RESOLVED'&&resolution.accountId!==accountId)throw Error('ACCOUNT_MAPPING_CONTRADICTS_DETERMINISTIC_FACT');
+  const selected=resolveAccount({...request,rememberedAccountId:accountId},ledger.entities,ledger.conflicts);
+  if(selected.state!=='RESOLVED'||selected.accountId!==accountId)throw Error('ACCOUNT_UNAVAILABLE');
   await this.memories.rememberAccountMapping(resolution.memoryKey,{accountId,rememberedAt:now});
  }
 
