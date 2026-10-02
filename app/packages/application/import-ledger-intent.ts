@@ -61,9 +61,7 @@ export function buildImportedLedgerIntent(input:LedgerIntentBuildInput):LedgerIn
    return {...base,kind:interpretation.eventKind,from:primary,consumptionAmount:0};
   case 'REFUND':case 'RETURN':
    return {...base,kind:interpretation.eventKind,originalId,destination:sponsored?null:primary,funding:sponsored?'EXTERNAL_SPONSOR':'OWN'};
-  case 'REPAYMENT':
-   // Current domain requires both endpoints; resolution keeps this blocked until issue #4 is resolved.
-   throw Error('REPAYMENT_ENDPOINTS_UNRESOLVED');
+  case 'REPAYMENT':return {...base,kind:'REPAYMENT',from:primary,to:null};
   default:throw Error('IMPORT_EVENT_NOT_POSTABLE');
  }
 }
