@@ -28,7 +28,7 @@ export function legacyDraftToExternalRecord(draft:Draft,sessionId:string,capture
  const facts:NormalizedSourceFacts={
   occurredAt:occurredAt(draft),
   amountFen:amountFen(draft),
-  feeFen:(()=>{try{return money(draft.fee||'0');}catch{return null;}})(),
+  feeFen:(()=>{if(draft.kind==='WITHDRAWAL'&&draft.platform==='微信'&&(draft.blockers||[]).includes('TRANSFER')&&(draft.fee||'0')==='0')return null;try{return money(draft.fee||'0');}catch{return null;}})(),
   transactionTypeRaw:first(row,['交易类型','交易分类']),
   directionRaw:first(row,['收/支','收支']),
   statusRaw:first(row,['当前状态','交易状态','状态']),
