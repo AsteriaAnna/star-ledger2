@@ -1,0 +1,64 @@
+name: Verify
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Install dependencies
+        working-directory: app
+        run: npm ci
+      - name: Typecheck core
+        working-directory: app
+        run: npm run typecheck
+      - name: Typecheck web
+        working-directory: app
+        run: npm run typecheck:web
+      - name: Platform boundary
+        working-directory: app
+        run: npm run check:platform
+      - name: Unit and application tests
+        working-directory: app
+        run: npm test
+      - name: Build web
+        working-directory: app
+        run: npm run build:web
+
+  import-browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Install dependencies
+        working-directory: app
+        run: npm ci
+      - name: Install Chromium
+        working-directory: app
+        run: npx playwright install --with-deps chromium
+      - name: Build web
+        working-directory: app
+        run: npm run build:web
+      - name: Import regression
+        working-directory: app
+        run: npm run test:web:imports
