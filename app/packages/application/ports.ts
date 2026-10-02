@@ -37,5 +37,6 @@ export interface ImportWorkspaceRepository {
  putExternalRecords(records:ExternalRecord[]):Promise<void>;
  listAttentionItems(sessionId:string):Promise<AttentionItem[]>;
  replaceAttentionItems(sessionId:string,items:AttentionItem[]):Promise<void>;
+ saveSessionSnapshot(session:ImportSession,records:ExternalRecord[],items:AttentionItem[]):Promise<void>;
  clearSession(id:string):Promise<void>;
 }
