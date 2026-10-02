@@ -15,6 +15,9 @@ import {linkAvailableRefunds} from './import-refunds';
 import {configureImportAccounts,rememberAccount,rememberAccountCommands,type AccountChoice} from './import-accounts';
 import {allowedAccount,resolveAccount,aliasId,aliasScope,canRemember,applyAccounts,accountSetupGroups} from './account-matcher';
 import {reviewDraft,groupKey,ruleCommand,ruleValue,sourcePayload,existingSource,identicalInterpretation,safeCandidates,auditSources} from './import-workflow';
+import {ImportStatementService} from '../../../packages/application/import-service.ts';
+import {LedgerResolutionMemoryRepository,WebImportWorkspaceRepository,migrateLegacyResolutionMemory} from './import-v2-repositories.ts';
+import {commitResolvedWebImport,resolveLegacyImportBatch} from './import-v2-flow.ts';
 const $=<T extends HTMLElement=HTMLElement>(q:string)=>document.querySelector<T>(q)!;
 const app=$('#app'),dialog=$<HTMLDialogElement>('#dialog');
 const esc=(v:any)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
@@ -132,18 +135,16 @@ async function importFile(){
  const file=await chooseFile('.xlsx,.csv');if(!file)return;if(file.size>15*1024*1024)throw Error('账单文件不能超过15 MB');
  let rows:any[][];
  if(file.name.toLowerCase().endsWith('.csv')){const bytes=await file.arrayBuffer();let text=new TextDecoder('utf-8').decode(bytes);if(text.includes('\uFFFD'))text=new TextDecoder('gb18030').decode(bytes);rows=csv(text);}else{const {default:readXlsxFile}=await import('read-excel-file');rows=await readXlsxFile(file);}
- const incoming=parseRows(rows,{profile:'本人',batch:hash(rows)});
- await mutate(store=>{const queue=structuredClone(store.state.imports||[]),p=project(store.state.ops);
-  for(const fresh of incoming){const index=queue.findIndex(d=>d.itemId===fresh.itemId);
-   if(index>=0&&!['committed','linked'].includes(queue[index].workflow||''))continue;
-   const d=fresh;reviewDraft(d,p.entities,p.conflicts);
-   if(!existingSource(d,p.entities).length&&safeCandidates(d,p.entities).length)d.blockers=[...(d.blockers||[]),'DUPLICATE'];
-   d.selected=!d.issue&&!['linked','noeffect','ignored'].includes(d.workflow||'');
-   if(index>=0)queue[index]=d;else queue.push(d);
-  }
-  store.state.imports=queue;store.state.importRevision=(store.state.importRevision||0)+1;
- });await refresh();setPage('import');
- if(accountSetupGroups(drafts,accounts(),entities('import_rules'),snap.conflicts).length)setupImportAccounts();else toast('已识别账单，可直接导入可入账记录');
+ const incoming=parseRows(rows,{profile:'本人',batch:hash(rows)});if(!incoming.length)throw Error('没有识别到可导入的账单记录');
+ const now=new Date().toISOString(),sessionId='import-'+crypto.randomUUID();
+ // Legacy aliases are migrated only when their meaning is safe; target aliases remain deliberately unmigrated.
+ await migrateLegacyResolutionMemory(now);await refresh();
+ const workspace=new WebImportWorkspaceRepository(),service=new ImportStatementService(workspace,new LedgerResolutionMemoryRepository());
+ const resolved=await resolveLegacyImportBatch({drafts:incoming,sessionId,ledger:snap,now,service});
+ const committed=await commitResolvedWebImport(resolved,now);
+ await refresh();setPage('import');
+ const s=committed.session;
+ toast(s.blockingAttentionCount?'已自动处理 '+s.committedCount+' 笔；还有 '+s.blockingAttentionCount+' 个问题需要确认':'导入完成 · '+s.committedCount+' 笔入账 · '+s.skippedDuplicateCount+' 笔重复已跳过');
 }
 function chooseFile(accept:string):Promise<File|undefined>{return new Promise(resolve=>{const input=document.createElement('input');input.type='file';input.accept=accept;input.onchange=()=>resolve(input.files?.[0]);input.addEventListener('cancel',()=>resolve(undefined));input.click();});}
 function download(name:string,text:string,type='application/json'){const url=URL.createObjectURL(new Blob([text],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);}
