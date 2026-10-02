@@ -263,7 +263,7 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
  commands.push(create({type:'transactions',id:c.id,fields:{event_type:c.kind,status,occurred_at:c.occurredAt,
   display_amount:c.amount,display_name:c.name,note:c.note??'',created_at:c.occurredAt,deleted_at:null}}));
  if(c.source) {
-  identifier(c.source.id);
+  identifier(c.source.id);if(c.source.capturedAt)timestamp(c.source.capturedAt);
   if(!['MANUAL','SCREENSHOT','EXCEL'].includes(c.source.sourceType)||!c.source.platform?.trim()||typeof c.source.rawPayload!=='string')throw Error('INVALID_SOURCE');
   commands.push(create({type:'source_records',id:c.source.id,fields:{transaction_id:c.id,source_type:c.source.sourceType,
    platform:c.source.platform,raw_payload:c.source.rawPayload,created_at:c.source.capturedAt??c.occurredAt}}));
