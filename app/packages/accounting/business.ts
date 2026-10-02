@@ -223,6 +223,13 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
   if(Date.parse(c.observedAt)<Date.parse(String(a.fields.opening_balance_at)))throw Error('ANCHOR_BEFORE_OPENING');
   return [create({type:'balance_anchors',id:c.observationId,fields:{account_id:c.accountId,observed_balance:c.observedBalance,observed_at:c.observedAt,source_type:c.sourceType,created_at:c.createdAt,deleted_at:null}})];
  }
+ if(c.kind==='ATTACH_SOURCE_EVIDENCE') {
+  const t=get('transactions',c.transactionId);if(!t||t.fields.deleted_at)throw Error('TRANSACTION_UNAVAILABLE');assertClear('transactions',c.transactionId);
+  identifier(c.source.id);if(!['MANUAL','SCREENSHOT','EXCEL'].includes(c.source.sourceType)||!c.source.platform?.trim()||typeof c.source.rawPayload!=='string')throw Error('INVALID_SOURCE');
+  const existing=get('source_records',c.source.id);if(existing){if(existing.fields.transaction_id===c.transactionId&&existing.fields.raw_payload===c.source.rawPayload)return [];throw Error('SOURCE_EVIDENCE_COLLISION');}
+  const createdAt=c.source.capturedAt??String(t.fields.occurred_at);timestamp(createdAt);
+  return [create({type:'source_records',id:c.source.id,fields:{transaction_id:c.transactionId,source_type:c.source.sourceType,platform:c.source.platform,raw_payload:c.source.rawPayload,created_at:createdAt}})];
+ }
  if(c.kind==='RESTORE_TRANSACTION') {
   const original=get('transactions',c.transactionId);if(!original||!original.fields.deleted_at||original.fields.purged_at)throw Error('TRANSACTION_UNAVAILABLE');
   assertClear('transactions',c.transactionId);
@@ -259,7 +266,7 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
   identifier(c.source.id);
   if(!['MANUAL','SCREENSHOT','EXCEL'].includes(c.source.sourceType)||!c.source.platform?.trim()||typeof c.source.rawPayload!=='string')throw Error('INVALID_SOURCE');
   commands.push(create({type:'source_records',id:c.source.id,fields:{transaction_id:c.id,source_type:c.source.sourceType,
-   platform:c.source.platform,raw_payload:c.source.rawPayload,created_at:c.occurredAt}}));
+   platform:c.source.platform,raw_payload:c.source.rawPayload,created_at:c.source.capturedAt??c.occurredAt}}));
  }
  let movementIndex=0;
  const movement=(id:AccountRef,flow:number)=>{
