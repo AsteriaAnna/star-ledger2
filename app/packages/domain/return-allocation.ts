@@ -17,7 +17,7 @@ const add=(a:number,b:number)=>{const n=a+b;if(!Number.isSafeInteger(n))throw Er
 export function resolveReturnAllocation(input:ReturnAllocationInput):ReturnAllocationResult{
  for(const value of [input.originalAmount,input.originalConsumption,input.previousReturned,input.previousReduction,input.amount])if(!safe(value))throw Error('INVALID_MONEY');
  if(input.originalAmount<=0||input.amount<=0)throw Error('INVALID_MONEY');
- if(input.originalConsumption>input.originalAmount)throw Error('INVALID_RETURN_ALLOCATION');
+ if(input.originalConsumption>input.originalAmount||input.previousReduction>input.previousReturned||input.previousReturned>input.originalAmount)throw Error('INVALID_RETURN_ALLOCATION');
  if(add(input.previousReturned,input.amount)>input.originalAmount)throw Error('RETURN_EXCEEDS_ORIGINAL');
 
  let reduction=input.requestedReduction;
