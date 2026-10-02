@@ -88,3 +88,19 @@ test('same source identity with the same V3 evidence remains an exact idempotent
  const result=await service.prepare({sessionId:'s',sourceType:'EXCEL',sourceSystem:'ALIPAY',records:[r],interpretations:[interpretation(r.id)],ledger:{entities,conflicts:[]},now:'2026-10-02T00:00:00Z'});
  assert.equal(result.records[0].disposition,'SKIP_DUPLICATE');assert.equal(result.session.skippedDuplicateCount,1);
 });
+
+
+test('same batch keeps first usable source event and marks later changed snapshot for evidence evolution',async()=>{
+ const workspace=new InMemoryImportWorkspace(),service=new ImportStatementService(workspace);
+ const first={...record('row-1'),sourceIdentity:'same-event',rawPayload:'snapshot-1'},later={...record('row-2'),sourceIdentity:'same-event',rawPayload:'snapshot-2'};
+ const result=await service.prepare({sessionId:'s',sourceType:'EXCEL',sourceSystem:'ALIPAY',records:[first,later],interpretations:[interpretation(first.id),interpretation(later.id)],ledger:{entities:[],conflicts:[]},now:'2026-10-02T00:00:00Z'});
+ assert.equal(result.records[0].disposition,'INTERPRETED');assert.equal(result.records[1].disposition,'SOURCE_UPDATE');
+ assert.equal(result.records[1].attention[0].kind,'SOURCE_UPDATE');
+});
+
+test('same batch exact source replay collapses without creating a second financial event',async()=>{
+ const workspace=new InMemoryImportWorkspace(),service=new ImportStatementService(workspace);
+ const first={...record('row-1'),sourceIdentity:'same-event',rawPayload:'same'},again={...record('row-2'),sourceIdentity:'same-event',rawPayload:'same'};
+ const result=await service.prepare({sessionId:'s',sourceType:'EXCEL',sourceSystem:'ALIPAY',records:[first,again],interpretations:[interpretation(first.id),interpretation(again.id)],ledger:{entities:[],conflicts:[]},now:'2026-10-02T00:00:00Z'});
+ assert.equal(result.records[0].disposition,'INTERPRETED');assert.equal(result.records[1].disposition,'SKIP_DUPLICATE');assert.equal(result.session.skippedDuplicateCount,1);
+});
