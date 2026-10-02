@@ -8,7 +8,7 @@ export type EventBase = {
 };
 export type CreateAccount = { kind:'CREATE_ACCOUNT'; id:string; name:string; accountType:'ASSET'|'LIABILITY';
  openingBalance:number|null; openingBalanceAt:string; tracking?:boolean; last4?:string };
-export type SetBalanceAnchor={kind:'SET_BALANCE_ANCHOR';id:string;accountId:string;observedBalance:number;observedAt:string;sourceType:'MANUAL'|'STATEMENT';createdAt:string};
+export type SetBalanceAnchor={kind:'SET_BALANCE_ANCHOR';accountId:string;observedBalance:number;observedAt:string;sourceType:'MANUAL'|'STATEMENT';createdAt:string};
 export type Purchase = EventBase & {kind:'PURCHASE';amount:number; payer:AccountRef; categoryId?:string;
  funding?:'OWN'|'EXTERNAL_SPONSOR'};
 export type Income = EventBase & {kind:'INCOME'|'TRANSFER_IN';amount:number; destination:AccountRef};
