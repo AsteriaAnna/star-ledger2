@@ -2,6 +2,8 @@
 
 > 基线：M4 merge `dc20c39f385050c26a81bf254ba041d79e5a73a9`
 
+> 当前进度（2026-10-03）：三项导入生命周期缺陷已修复，PENDING 账户回答已推进；M5.1 尚未完成。详见 [生命周期修复进度](m5-1-lifecycle-fixes-progress.md) 和 [完整验收计划](2026-10-03-project-review.md)。
+
 M5 只实现已经冻结的 M4 责任，不重新发明 Draft/workflow/blocker 状态机。
 
 ## M5.1 导入闭环

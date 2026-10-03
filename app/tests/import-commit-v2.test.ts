@@ -37,7 +37,7 @@ test('non-blocking attention never prevents a known financial fact from committi
 test('revive plan preserves existing transaction identity instead of creating a second economic record',()=>{
  const r=source('revive'),row=resolved('revive',{disposition:'REVIVE_EXISTING',transactionId:'old-transaction',ledgerState:'NOT_APPLICABLE'});
  const plan=planImportCommit({session:{...session,sourceCount:1},records:[row]},[r]);
- assert.equal(plan.newRecords.length,0);assert.equal(plan.revivals.length,1);assert.equal(plan.revivals[0].transactionId,'old-transaction');assert.equal(plan.revivals[0].replacement.id,'old-transaction');
+ assert.equal(plan.newRecords.length,0);assert.equal(plan.revivals.length,1);assert.equal(plan.revivals[0].transactionId,'old-transaction');assert.equal('replacement' in plan.revivals[0],false);
 });
 
 test('commit planning fails if a resolved record has lost its source evidence',()=>{

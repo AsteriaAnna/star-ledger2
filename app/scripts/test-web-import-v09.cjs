@@ -85,5 +85,17 @@ const ali=ah+'2026-09-21 12:00:00,餐饮美食,商户,午餐,支出,10,农业银
  const oldContext=await browser.newContext();const oldPage=await oldContext.newPage();await oldPage.goto(baseUrl+'/#import');await oldPage.locator('[data-action=import-file]').waitFor();await oldPage.evaluate(state=>new Promise(resolve=>{const r=indexedDB.open('star-ledger-next-v1');r.onsuccess=()=>{const tx=r.result.transaction('ledger','readwrite');tx.objectStore('ledger').put(state,'main');tx.oncomplete=()=>{r.result.close();resolve();};};}),legacy.state);await oldPage.reload();await oldPage.locator('[data-action=import-file]').waitFor();
  assert.equal(entities(await db(oldPage),'transactions')[0].event_type,'PURCHASE');await oldPage.locator('#import-show').selectOption('linked');await oldPage.locator('[data-source-review]').click();await oldPage.locator('#source-change-form [type=submit]').click();await oldPage.locator('#confirm-form [type=submit]').click();await oldPage.locator('dialog').waitFor({state:'hidden'});
  const corrected=await db(oldPage);assert.equal(entities(corrected,'transactions').length,1);assert.equal(entities(corrected,'transactions')[0].event_type,'REPAYMENT');assert.equal(entities(corrected,'transactions')[0].note,'保留备注');assert.equal(entities(corrected,'consumption_effects')[0].amount,0);assert.equal(entities(corrected,'source_records').find(e=>e.id==='legacy-source').raw_payload,rawPayload);assert.equal(entities(corrected,'balance_movements').filter(e=>e.account_id==='bank').reduce((n,e)=>n+e.amount,0),-3000);ok('Legacy reimport previews and explicitly corrects purchase to repayment without duplicate debit or lost evidence');
+ const pendingContext=await browser.newContext(),pendingPage=await pendingContext.newPage();pendingPage.on('pageerror',e=>errors.push(e.message));
+ await pendingPage.goto(baseUrl+'/#import');await pendingPage.locator('[data-action=import-file]').waitFor();
+ const pendingSession=await upload(pendingPage,'pending.csv',ah+'2026-09-21 12:00:00,餐饮美食,商户,午餐,支出,10,花呗,处理中,pending-1\n');
+ await answerAccount(pendingPage,pendingSession,'花呗','待入账花呗');
+ await pendingPage.reload();await pendingPage.locator('[data-action=import-file]').waitFor();
+ const pendingState=await db(pendingPage),pendingTx=entities(pendingState,'transactions')[0];
+ assert.equal(pendingTx.status,'PENDING');assert.equal(entities(pendingState,'balance_movements').length,0);assert.equal(entities(pendingState,'consumption_effects').length,0);
+ const plannedMovement=JSON.parse(pendingTx.posting_plan).find(e=>e.type==='balance_movements');
+ assert.equal(plannedMovement.fields.account_id,entities(pendingState,'accounts')[0].id);assert.equal(plannedMovement.fields.amount,1000);
+ assert.equal(pendingState.importWorkspace.attention[pendingSession].length,0);
+ ok('Pending account answer persists a liability posting plan across reload without changing balances or consumption');
+ assert.deepEqual(errors,[]);
  fs.writeFileSync('/tmp/star-import-v09-validation.json',JSON.stringify({results,errors},null,2));
  }catch(e){if(page){console.error('TOAST',await page.locator('#toast').textContent());console.error((await page.locator('main').innerText()).slice(-2000));}throw e;}finally{await browser?.close();server.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

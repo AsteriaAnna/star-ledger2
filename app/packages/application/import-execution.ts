@@ -1,7 +1,6 @@
 import type {BusinessCommand} from '../domain/accounting.ts';
 import type {LedgerSnapshot} from '../accounting/index.ts';
-import {applyCommands,correctionSnapshot,interpret} from '../accounting/business.ts';
-import {planTransactionCorrection} from './correction-service.ts';
+import {applyCommands,interpret} from '../accounting/business.ts';
 import type {ImportCommitPlan} from './import-commit.ts';
 import type {AttentionItem,ImportRecordOutcome,ImportSession} from '../importing/types.ts';
 import {summarizeSession} from '../importing/attention.ts';
@@ -43,11 +42,6 @@ export function planImportExecution(plan:ImportCommitPlan,snapshot:LedgerSnapsho
  for(const revival of plan.revivals){
   const restore:BusinessCommand={kind:'RESTORE_TRANSACTION',transactionId:revival.transactionId};
   const restored=advance(working,restore);working=restored.snapshot;commands.push(restore);
-  const correction=planTransactionCorrection({
-   transactionId:revival.transactionId,replacement:revival.replacement,
-   expectedSnapshot:correctionSnapshot(working.entities,revival.transactionId),correctedAt:now
-  },working);
-  for(const command of correction.commands){const next=advance(working,command);working=next.snapshot;commands.push(command);}
   revived.push(revival.transactionId);revivedRecords.push(revival.externalRecordId);
  }
 
@@ -62,7 +56,11 @@ export function planImportExecution(plan:ImportCommitPlan,snapshot:LedgerSnapsho
 
 export function mergeImportOutcomes(existing:ImportRecordOutcome[],next:ImportRecordOutcome[]):ImportRecordOutcome[]{
  const map=new Map(existing.map(item=>[item.externalRecordId,item]));
- for(const item of next)map.set(item.externalRecordId,item);
+ for(const item of next){
+  // Re-observing evidence does not undo a prior commit or unresolved decision.
+  if(item.state==='SKIPPED_DUPLICATE'&&map.has(item.externalRecordId))continue;
+  map.set(item.externalRecordId,item);
+ }
  return [...map.values()].sort((a,b)=>a.externalRecordId.localeCompare(b.externalRecordId));
 }
 export function completeImportSessionFromOutcomes(session:ImportSession,outcomes:ImportRecordOutcome[],attention:AttentionItem[],now:string):ImportSession{

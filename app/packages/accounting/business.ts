@@ -22,6 +22,13 @@ export function correctionSnapshot(entities:Entity[],id:string){
  return JSON.stringify(entities.filter(e=>e.type==='transactions'&&e.id===id||e.fields.transaction_id===id||e.fields.from_transaction_id===id||e.fields.to_transaction_id===id).sort((a,b)=>(a.type+':'+a.id).localeCompare(b.type+':'+b.id)));
 }
 
+export function pendingPostings(transaction:Entity):Entity[]{
+ if(transaction.fields.status!=='PENDING')throw Error('TRANSACTION_NOT_PENDING');
+ let values:unknown;try{values=JSON.parse(String(transaction.fields.posting_plan));}catch{throw Error('INVALID_POSTING_PLAN');}
+ if(!Array.isArray(values)||values.some(e=>!e||typeof e.id!=='string'||!['balance_movements','consumption_effects','transaction_links'].includes(e.type)||!e.fields||(e.type==='transaction_links'?e.fields.from_transaction_id:e.fields.transaction_id)!==transaction.id))throw Error('INVALID_POSTING_PLAN');
+ return values as Entity[];
+}
+
 export class BusinessAccountingService {
  private core:AccountingService;
  constructor(store:Store,device:string){this.core=new AccountingService(store,device);}
@@ -49,6 +56,21 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
   assertClear('accounts',id);return a;
  };
  const commands:Command[]=[];
+ if(c.kind==='BIND_PENDING_ACCOUNT'){
+  const tx=get('transactions',c.transactionId);
+  if(!tx||tx.fields.deleted_at||tx.fields.purged_at||tx.fields.status!=='PENDING')throw Error('TRANSACTION_UNAVAILABLE');
+  assertClear('transactions',tx.id);
+  if(correctionSnapshot(entities,tx.id)!==c.expectedSnapshot)throw Error('STALE_TRANSACTION');
+  const planned=pendingPostings(tx);
+  if(!planned.some(e=>e.type==='balance_movements'&&e.id===c.movementId))throw Error('MOVEMENT_UNAVAILABLE');
+  const virtual={...snapshot,entities:[...entities.filter(e=>e.id!==tx.id||e.type!=='transactions'),{...tx,fields:{...tx.fields,status:'SUCCESS'}},...planned]};
+  // Reuse the same account/type/sign constraints, but persist only the future plan.
+  const binding=interpret({kind:'BIND_ACCOUNT',movementId:c.movementId,accountId:c.accountId},virtual);
+  const updated=applyCommands(virtual,binding);
+  const next=planned.map(e=>updated.entities.find(v=>v.type===e.type&&v.id===e.id)!);
+  if(!binding.length)return [];
+  return [{action:'PATCH_FIELD',entity:{type:'transactions',id:tx.id,fields:{posting_plan:JSON.stringify(next)}}}];
+ }
  if(c.kind==='CORRECT_TRANSACTION'||c.kind==='CORRECT_IMPORTED_EVENT') {
   const t=get('transactions',c.transactionId);if(!t||t.fields.deleted_at)throw Error('TRANSACTION_UNAVAILABLE');
   assertClear('transactions',t.id);timestamp(c.correctedAt);if(c.kind==='CORRECT_IMPORTED_EVENT')identifier(c.sourceId);
@@ -348,6 +370,10 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
    break;
   }
   default:throw Error('UNSUPPORTED_BUSINESS_COMMAND');
+ }
+ if(status==='PENDING'){
+  const planned=interpret({...c,status:'SUCCESS'} as BusinessCommand,snapshot).filter(command=>!['transactions','source_records'].includes(command.entity.type)).map(command=>command.entity);
+  commands.find(command=>command.entity.type==='transactions')!.entity.fields.posting_plan=JSON.stringify(planned);
  }
  return commands;
 }

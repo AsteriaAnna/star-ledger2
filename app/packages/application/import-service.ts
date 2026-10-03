@@ -197,6 +197,14 @@ export class ImportStatementService {
 
   const prepared:PreparedImportRecord[]=[];
   const allAttention:AttentionItem[]=[];
+  const previousRecords=await this.workspace.listExternalRecords(input.sessionId);
+  const previousAttention=await this.workspace.listAttentionItems(input.sessionId);
+  const keyOf=(record:ExternalRecord)=>[record.sourceSystem,record.platformRaw,record.profile,record.sourceIdentity].join('\u001f');
+  const observations=new Map<string,Set<string>>();
+  for(const record of input.records){
+   if(byRecord.get(record.id)?.status==='FAILED')continue;
+   const key=keyOf(record),raws=observations.get(key)??new Set<string>();raws.add(record.rawPayload);observations.set(key,raws);
+  }
   const batchSources=new Map<string,string>();
   let skippedDuplicateCount=0,noEffectCount=0;
 
@@ -204,21 +212,30 @@ export class ImportStatementService {
    const interpretation=byRecord.get(record.id);
    if(!interpretation)throw Error('MISSING_INTERPRETATION');
    if(interpretation.externalRecordId!==record.id)throw Error('INTERPRETATION_RECORD_MISMATCH');
-   const batchKey=[record.sourceSystem,record.platformRaw,record.profile,record.sourceIdentity].join('\u001f');
-   const priorRaw=batchSources.get(batchKey);
+   const batchKey=keyOf(record);
+   const sourceMatch=findSourceMatch({value:record.sourceIdentity,platform:record.platformRaw,profile:record.profile,orderId:record.facts.orderId,rawPayload:record.rawPayload},input.ledger.entities);
+   // Failed observations are evidence, not an already-created transaction target.
+   if(!sourceMatch.transactionIds.length&&interpretation.status==='FAILED'){
+    noEffectCount++;prepared.push({externalRecordId:record.id,disposition:'NO_EFFECT',transactionId:null,interpretation,attention:[]});continue;
+   }
+   // With no durable target, competing usable snapshots require a decision for the
+   // whole group. File order must not decide which financial facts win.
+   if(!sourceMatch.transactionIds.length&&(observations.get(batchKey)?.size??0)>1){
+    const items=[createAttention({sessionId:input.sessionId,externalRecordId:record.id,kind:'SOURCE_UPDATE',question:'同一来源存在不同证据，需要确认采用哪份账务信息',blocking:true,candidates:[],createdAt:input.now})];
+    allAttention.push(...items);prepared.push({externalRecordId:record.id,disposition:'NEEDS_ATTENTION',transactionId:null,interpretation,attention:items});continue;
+   }
+   const previous=previousRecords.find(r=>r.id===record.id&&keyOf(r)===batchKey&&r.rawPayload===record.rawPayload);
+   const unresolved=previous?previousAttention.filter(a=>a.externalRecordId===record.id):[];
+   if(sourceMatch.activeTransactionIds.length===1&&unresolved.some(a=>a.kind==='SOURCE_UPDATE')){
+    allAttention.push(...unresolved);prepared.push({externalRecordId:record.id,disposition:'SOURCE_UPDATE',transactionId:sourceMatch.activeTransactionIds[0],interpretation,attention:unresolved});continue;
+   }
+   const priorRaw=sourceMatch.transactionIds.length?undefined:batchSources.get(batchKey);
    if(priorRaw!==undefined){
     if(priorRaw===record.rawPayload){skippedDuplicateCount++;prepared.push({externalRecordId:record.id,disposition:'SKIP_DUPLICATE',transactionId:null,interpretation,attention:[]});continue;}
     const items=[createAttention({sessionId:input.sessionId,externalRecordId:record.id,kind:'SOURCE_UPDATE',question:'同一来源在这批账单中出现了新的官方证据；证据会保留，账务变化需要单独核对',blocking:true,candidates:[],createdAt:input.now})];
     allAttention.push(...items);prepared.push({externalRecordId:record.id,disposition:'SOURCE_UPDATE',transactionId:null,interpretation,attention:items});continue;
    }
    batchSources.set(batchKey,record.rawPayload);
-
-   const sourceMatch=findSourceMatch({
-    value:record.sourceIdentity,
-    platform:record.platformRaw,
-    profile:record.profile,
-    orderId:record.facts.orderId,rawPayload:record.rawPayload
-   },input.ledger.entities);
 
    if(sourceMatch.activeTransactionIds.length===1){
     const transactionId=sourceMatch.activeTransactionIds[0];
@@ -227,7 +244,8 @@ export class ImportStatementService {
      allAttention.push(...items);prepared.push({externalRecordId:record.id,disposition:'SOURCE_UPDATE',transactionId,interpretation,attention:items});continue;
     }
     skippedDuplicateCount++;
-    prepared.push({externalRecordId:record.id,disposition:'SKIP_DUPLICATE',transactionId,interpretation,attention:[]});
+    allAttention.push(...unresolved);
+    prepared.push({externalRecordId:record.id,disposition:'SKIP_DUPLICATE',transactionId,interpretation,attention:unresolved});
     continue;
    }
    if(sourceMatch.activeTransactionIds.length>1){
@@ -235,6 +253,11 @@ export class ImportStatementService {
     allAttention.push(...items);prepared.push({externalRecordId:record.id,disposition:'NEEDS_ATTENTION',transactionId:null,interpretation,attention:items});continue;
    }
    if(sourceMatch.deletedTransactionIds.length===1){
+    const transactionId=sourceMatch.deletedTransactionIds[0];
+    if(sourceMatch.changedEvidenceTransactionIds.includes(transactionId)&&!sourceMatch.exactEvidenceTransactionIds.includes(transactionId)){
+     const items=[createAttention({sessionId:input.sessionId,externalRecordId:record.id,kind:'SOURCE_UPDATE',question:'回收站记录的来源已变化，需要先确认恢复及账务变化',blocking:true,candidates:[{id:transactionId,label:transactionId}],createdAt:input.now})];
+     allAttention.push(...items);prepared.push({externalRecordId:record.id,disposition:'NEEDS_ATTENTION',transactionId,interpretation,attention:items});continue;
+    }
     const items=validateInterpretation(input.sessionId,record,interpretation,input.now);
     allAttention.push(...items);
     prepared.push({externalRecordId:record.id,disposition:'REVIVE_EXISTING',transactionId:sourceMatch.deletedTransactionIds[0],interpretation,attention:items});continue;

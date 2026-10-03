@@ -90,11 +90,11 @@ test('same source identity with the same V3 evidence remains an exact idempotent
 });
 
 
-test('same batch keeps first usable source event and marks later changed snapshot for evidence evolution',async()=>{
+test('same batch conflicting usable snapshots block the group instead of trusting file order',async()=>{
  const workspace=new InMemoryImportWorkspace(),service=new ImportStatementService(workspace);
  const first={...record('row-1'),sourceIdentity:'same-event',rawPayload:'snapshot-1'},later={...record('row-2'),sourceIdentity:'same-event',rawPayload:'snapshot-2'};
  const result=await service.prepare({sessionId:'s',sourceType:'EXCEL',sourceSystem:'ALIPAY',records:[first,later],interpretations:[interpretation(first.id),interpretation(later.id)],ledger:{entities:[],conflicts:[]},now:'2026-10-02T00:00:00Z'});
- assert.equal(result.records[0].disposition,'INTERPRETED');assert.equal(result.records[1].disposition,'SOURCE_UPDATE');
+ assert.equal(result.records[0].disposition,'NEEDS_ATTENTION');assert.equal(result.records[1].disposition,'NEEDS_ATTENTION');
  assert.equal(result.records[1].attention[0].kind,'SOURCE_UPDATE');
 });
 
@@ -103,4 +103,22 @@ test('same batch exact source replay collapses without creating a second financi
  const first={...record('row-1'),sourceIdentity:'same-event',rawPayload:'same'},again={...record('row-2'),sourceIdentity:'same-event',rawPayload:'same'};
  const result=await service.prepare({sessionId:'s',sourceType:'EXCEL',sourceSystem:'ALIPAY',records:[first,again],interpretations:[interpretation(first.id),interpretation(again.id)],ledger:{entities:[],conflicts:[]},now:'2026-10-02T00:00:00Z'});
  assert.equal(result.records[0].disposition,'INTERPRETED');assert.equal(result.records[1].disposition,'SKIP_DUPLICATE');assert.equal(result.session.skippedDuplicateCount,1);
+});
+
+test('failed observation never consumes the identity of a later successful observation in either order',async()=>{
+ for(const reverse of [false,true]){
+  const rows=[{...record('failed'),sourceIdentity:'order',rawPayload:'failed'},{...record('success'),sourceIdentity:'order',rawPayload:'success'}];
+  if(reverse)rows.reverse();
+  const service=new ImportStatementService(new InMemoryImportWorkspace());
+  const result=await service.prepare({sessionId:'s',sourceType:'EXCEL',sourceSystem:'ALIPAY',records:rows,interpretations:rows.map(r=>interpretation(r.id,{status:r.id==='failed'?'FAILED':'SUCCESS'})),ledger:{entities:[],conflicts:[]},now:'2026-10-03T00:00:00Z'});
+  assert.equal(result.records.find(r=>r.externalRecordId==='failed')?.disposition,'NO_EFFECT');
+  assert.equal(result.records.find(r=>r.externalRecordId==='success')?.disposition,'INTERPRETED');
+ }
+});
+
+test('changed evidence for a deleted transaction requires a decision instead of restoring and overwriting',async()=>{
+ const r={...record('source-1'),rawPayload:'changed'};
+ const ledger={entities:[transaction('t1','2026-10-02T00:00:00Z'),{type:'source_records' as const,id:'sr',fields:{transaction_id:'t1',source_type:'EXCEL',platform:'支付宝',raw_payload:JSON.stringify({version:3,identity:'source-1',profile:'本人',original:'original'})}}],conflicts:[]};
+ const result=await new ImportStatementService(new InMemoryImportWorkspace()).prepare({sessionId:'s',sourceType:'EXCEL',sourceSystem:'ALIPAY',records:[r],interpretations:[interpretation(r.id)],ledger,now:'2026-10-03T00:00:00Z'});
+ assert.equal(result.records[0].disposition,'NEEDS_ATTENTION');assert.equal(result.records[0].attention[0].kind,'SOURCE_UPDATE');
 });

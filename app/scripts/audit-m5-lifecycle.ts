@@ -2,6 +2,7 @@
  * Run: node scripts/audit-m5-lifecycle.ts (from app/). Synthetic data only.
  * Exit 0 means diagnostic completed; inspect each `violation`, not the exit code.
  */
+import {pathToFileURL} from 'node:url';
 import {applyCommands,correctionSnapshot,interpret} from '../packages/accounting/business.ts';
 import type {LedgerSnapshot} from '../packages/accounting/index.ts';
 import type {BusinessCommand} from '../packages/domain/accounting.ts';
@@ -24,6 +25,7 @@ function harness(){
  const commit=async(records:ExternalRecord[],interpretations:EventInterpretation[])=>{const resolved=await resolve(records,interpretations);const plan=planImportCommit(resolved,records);const execution=planImportExecution(plan,ledger,at);execute(execution.commands);return {resolved,plan,execution};};
  return {workspace,prepare,resolve,commit,execute,snapshot:()=>ledger};
 }
+export async function runLifecycleAudit(){
 const findings=[];
 {
  const h=harness(),r=record('revive'),first=await h.commit([r],[meaning(r.id)]),id=first.execution.createdIds[0];
@@ -48,4 +50,6 @@ const findings=[];
  try{h.execute(planImportExecution(planImportCommit(result,rows),h.snapshot(),at).commands);}catch(e){error=String(e);}
  findings.push({id:'FAILED_PREDECESSOR_BREAKS_BATCH',dispositions:result.records.map(r=>r.disposition),error,transactionCount:h.snapshot().entities.filter(e=>e.type==='transactions').length,expected:'valid successor and unrelated row can be handled without missing-target error',violation:error!==null});
 }
-console.log(JSON.stringify({auditedCodeCommit:'66fd47bc09bb85f4f3a57aa0082f6e1fd56a800e',scope:'application services and accounting interpreter; synthetic data; no browser or storage failure injection',findings},null,2));
+return {originalFailureBaseline:'66fd47bc09bb85f4f3a57aa0082f6e1fd56a800e',scope:'application services and accounting interpreter; synthetic data; no browser or storage failure injection',findings};
+}
+if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)console.log(JSON.stringify(await runLifecycleAudit(),null,2));

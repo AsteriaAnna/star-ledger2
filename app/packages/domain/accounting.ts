@@ -30,6 +30,7 @@ export type LedgerIntent = Purchase|Income|InternalTransfer|Withdrawal|ExternalP
 export type FinancialEvent = LedgerIntent;
 export type SetStatus = {kind:'SET_STATUS';transactionId:string;status:'SUCCESS'|'FAILED';settlement?:FinancialEvent};
 export type BindAccount = ({kind:'BIND_ACCOUNT'}|{kind:'RESOLVE_ACCOUNT_BINDING'}) & {movementId:string;accountId:string};
+export type BindPendingAccount={kind:'BIND_PENDING_ACCOUNT';transactionId:string;movementId:string;accountId:string;expectedSnapshot:string};
 export type ResolveSettlement = {kind:'RESOLVE_SETTLEMENT';transactionId:string;status:'SUCCESS'|'FAILED';settlement?:FinancialEvent;expectedOperationIds:string[]};
 export type CorrectAmount = {kind:'CORRECT_AMOUNT';transactionId:string;amount:number;expectedAmount:number;reason:string;correctedAt:string;sourceId:string};
 export type LinkReturn = {kind:'LINK_RETURN';transactionId:string;originalId:string};
@@ -37,4 +38,4 @@ export type UnlinkReturn = {kind:'UNLINK_RETURN';transactionId:string;detachedAt
 export type CorrectTransaction={kind:'CORRECT_TRANSACTION';transactionId:string;replacement:LedgerIntent;expectedSnapshot:string;correctedAt:string};
 /** @deprecated V1 compatibility only. New application code uses CORRECT_TRANSACTION. */
 export type CorrectImportedEvent={kind:'CORRECT_IMPORTED_EVENT';transactionId:string;replacement:FinancialEvent;expectedSnapshot:string;sourceId:string;correctedAt:string};
-export type BusinessCommand = CorrectTransaction|CorrectImportedEvent|LinkReturn|UnlinkReturn| CorrectAmount|SetBalanceAnchor| ResolveSettlement| SetStatus|BindAccount| DeleteTransaction|RestoreTransaction|AttachSourceEvidence| CreateAccount|Purchase|Income|InternalTransfer|Withdrawal|ExternalPayment|Repayment|Refund|Meaning;
+export type BusinessCommand = BindPendingAccount|CorrectTransaction|CorrectImportedEvent|LinkReturn|UnlinkReturn| CorrectAmount|SetBalanceAnchor| ResolveSettlement| SetStatus|BindAccount| DeleteTransaction|RestoreTransaction|AttachSourceEvidence| CreateAccount|Purchase|Income|InternalTransfer|Withdrawal|ExternalPayment|Repayment|Refund|Meaning;
