@@ -68,6 +68,16 @@ const ali=ah+'2026-09-21 12:00:00,餐饮美食,商户,午餐,支出,10,农业银
  const huabei=entities(s,'accounts').find(a=>a.name==='我的花呗');assert.equal(huabei.type,'LIABILITY');
  assert.equal(entities(s,'balance_movements').find(m=>m.account_id===huabei.id).amount,3000);
  ok('Sponsor, classification, failed orders and liability binding preserve financial semantics');
+ const targetItem=s.importWorkspace.attention[aliSession].find(a=>a.kind==='TRANSFER_ENDPOINTS');assert.ok(targetItem);
+ const targetTx=s.importWorkspace.outcomes[aliSession].find(o=>o.externalRecordId===targetItem.externalRecordId).transactionId;
+ const beforeTargetCount=entities(s,'transactions').length,beforeTargetEffects=entities(s,'consumption_effects');
+ const targetPanel=page.locator(`[data-import-session="${aliSession}"]`);await targetPanel.locator('details').evaluate(e=>e.open=true);
+ await targetPanel.locator(`[data-v2-attention="${targetItem.id}"]`).click();await page.locator('#v2-transfer-form [name=account]').selectOption(huabei.id);
+ await page.locator('#v2-transfer-form [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});s=await db(page);
+ assert.equal(entities(s,'transactions').length,beforeTargetCount);assert.deepEqual(entities(s,'consumption_effects'),beforeTargetEffects);
+ assert.equal(entities(s,'balance_movements').find(m=>m.transaction_id===targetTx&&m.account_id===huabei.id).amount,-3000);
+ await page.reload();await page.locator('[data-action=import-file]').waitFor();s=await db(page);assert.ok(!s.importWorkspace.attention[aliSession].some(a=>a.id===targetItem.id));
+ ok('Repayment asks for its destination account and preserves transactions and consumption across reload');
  const ops=s.ops.length;await page.reload();await page.locator('[data-action=import-file]').waitFor();
  const repeat=await upload(page,'ali.csv',ali);s=await db(page);assert.equal(s.ops.length,ops);assert.equal(s.importWorkspace.sessions[repeat].skippedDuplicateCount,6);
  assert.equal(s.importWorkspace.sessions[aliSession].committedCount,6);ok('Reload + repeat does not duplicate postings or rewrite earlier session outcomes');
@@ -139,6 +149,15 @@ const ali=ah+'2026-09-21 12:00:00,餐饮美食,商户,午餐,支出,10,农业银
  const recovered=await db(recoveryPage);assert.equal(entities(recovered,'transactions').length,1);assert.equal(recovered.importWorkspace.sessions.interrupted.committedCount,1);
  await recoveryPage.reload();await recoveryPage.locator('[data-action=import-file]').waitFor();assert.equal(await recoveryPage.locator('[data-v2-resume=interrupted]').count(),0);assert.equal(entities(await db(recoveryPage),'transactions').length,1);
  ok('A captured PROCESSING session resumes after reload and commits once with correct durable outcomes');
+ await page.locator('[data-page=bills]:visible').first().click();await page.locator('#month').fill('2026-09');await page.locator('#month').dispatchEvent('change');
+ const selectionOps=(await db(page)).ops.length;
+ for(const [selector,value] of [['#type-filter','PURCHASE'],['#account-filter',bank],['#status-filter','SUCCESS']]){
+  await page.locator('[data-select]').first().check();await page.locator('[data-action=batch-delete]').waitFor();await page.locator(selector).selectOption(value);
+  assert.equal(await page.locator('[data-select]:checked').count(),0);assert.equal(await page.locator('[data-action=batch-delete]').count(),0);
+ }
+ await page.locator('[data-select]').first().check();await page.locator('#search').fill('午餐');await page.waitForFunction(()=>!document.querySelector('[data-action=batch-delete]'));
+ assert.equal(await page.locator('[data-select]:checked').count(),0);assert.equal((await db(page)).ops.length,selectionOps);
+ ok('Changing transaction filters or search clears selection without writing ledger operations');
  assert.deepEqual(errors,[]);
  fs.writeFileSync('/tmp/star-import-v09-validation.json',JSON.stringify({results,errors},null,2));
  }catch(e){if(page){console.error('TOAST',await page.locator('#toast').textContent());console.error((await page.locator('main').innerText()).slice(-2000));}throw e;}finally{await browser?.close();server.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

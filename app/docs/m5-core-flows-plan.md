@@ -6,6 +6,8 @@
 
 > 后续已接通部分来源决定和 PROCESSING/FAILED 继续处理入口，详见 [来源决定与恢复进度](m5-1-source-review-progress.md)。其他 typed Attention 与真实样本门槛仍保留。
 
+> 用户任务核验：本轮修复筛选后的隐藏选择，并接通还款/提现/内部转账目标账户。底层服务不等于页面重构完成；改账、手工记账与对账仍待接通。详见 [用户任务与系统责任进度](m5-user-task-progress.md)。下一实现重点为 M5.2，M5.1 未通过门槛继续保留。
+
 M5 只实现已经冻结的 M4 责任，不重新发明 Draft/workflow/blocker 状态机。
 
 ## M5.1 导入闭环
