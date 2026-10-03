@@ -1,5 +1,7 @@
 # 星账 V2 · M5 核心流程实现计划
 
+> **当前执行入口（2026-10-03 更新）**：[M1–M7 职责驱动计划](m1-m7-execution-plan.md) 与 [职责契约](responsibility-contract.md)。本文件保留历史设计/时点记录；后续顺序、实际状态及本轮明确修订以当前执行入口为准。
+
 > 基线：M4 merge `dc20c39f385050c26a81bf254ba041d79e5a73a9`
 
 > 当前进度（2026-10-03）：三项导入生命周期缺陷已修复，PENDING 账户回答已推进；M5.1 尚未完成。详见 [生命周期修复进度](m5-1-lifecycle-fixes-progress.md) 和 [完整验收计划](2026-10-03-project-review.md)。
