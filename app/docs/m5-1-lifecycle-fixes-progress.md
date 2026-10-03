@@ -2,6 +2,8 @@
 
 承接 `2026-10-03-project-review.md` 的审查基线。原审查和失败快照保留作历史证据，本文件记录后续实现。
 
+下一轮已推进来源回答及会话恢复，最新状态见 [来源决定与恢复进度](m5-1-source-review-progress.md)。本文件保留当轮验收记录。
+
 ## 已完成
 
 1. **相同来源删除重导保留用户修改。** ImportRevival 只表达恢复已有交易，不再带来源 replacement，也不再调用 Correction Service 覆盖交易。来源确已变化的回收站记录先进入 SOURCE_UPDATE 问题，不自动恢复改写。

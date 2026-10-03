@@ -3,7 +3,10 @@ import {ImportStatementService,type ResolveImportResult} from '../../../packages
 import {planImportCommit,type ImportCommitPlan} from '../../../packages/application/import-commit.ts';
 import {completeImportSessionFromOutcomes,importRecordOutcomes,mergeImportOutcomes,planImportExecution,type ImportExecutionPlan} from '../../../packages/application/import-execution.ts';
 import {BusinessAccountingService} from '../../../packages/accounting/business.ts';
-import {mutate} from './store.ts';
+import {mutate,read} from './store.ts';
+import {project} from '../../../packages/sync/projection.ts';
+import {planResumeImport} from '../../../packages/application/import-resume.ts';
+import {sourceReviewToken} from '../../../packages/application/import-source-attention.ts';
 import type {ExternalRecord} from '../../../packages/importing/types.ts';
 import type {Draft} from './importer.ts';
 import {legacyDraftToExternalRecord,legacyDraftToInterpretation} from './import-v2-adapter.ts';
@@ -13,6 +16,17 @@ export type ResolvedWebImport={
  result:ResolveImportResult;
  plan:ImportCommitPlan;
 };
+
+export async function resumeImportSession(sessionId:string){
+ const state=await read();if(!state.importWorkspace)throw Error('IMPORT_SESSION_NOT_RESUMABLE');
+ const plan=await planResumeImport(sessionId,state.importWorkspace,project(state.ops),new Date().toISOString());
+ await mutate(store=>{
+  if(!store.state.importWorkspace||sourceReviewToken(store.state.importWorkspace,{entities:store.entities,conflicts:store.conflicts})!==plan.expectedToken)throw Error('STALE_SOURCE_REVIEW');
+  new BusinessAccountingService(store,store.state.device).executeBatch(plan.execution.commands);
+  store.state.importWorkspace=plan.workspace;
+ });
+ return plan.session;
+}
 
 export async function resolveLegacyImportBatch(input:{
  drafts:Draft[];

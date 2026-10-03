@@ -1,4 +1,4 @@
-import type {AttentionItem,ExternalRecord,ImportRecordOutcome,ImportSession} from '../importing/types.ts';
+import type {AttentionItem,EventInterpretation,ExternalRecord,ImportRecordOutcome,ImportSession} from '../importing/types.ts';
 
 export type AccountIdentity={
  sourceSystem:string;
@@ -40,6 +40,6 @@ export interface ImportWorkspaceRepository {
  listOutcomes(sessionId:string):Promise<ImportRecordOutcome[]>;
  replaceOutcomes(sessionId:string,outcomes:ImportRecordOutcome[]):Promise<void>;
  replaceAttentionItems(sessionId:string,items:AttentionItem[]):Promise<void>;
- saveSessionSnapshot(session:ImportSession,records:ExternalRecord[],items:AttentionItem[]):Promise<void>;
+ saveSessionSnapshot(session:ImportSession,records:ExternalRecord[],items:AttentionItem[],interpretations?:EventInterpretation[]):Promise<void>;
  clearSession(id:string):Promise<void>;
 }

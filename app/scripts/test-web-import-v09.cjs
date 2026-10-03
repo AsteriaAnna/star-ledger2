@@ -28,6 +28,14 @@ async function answerAccount(page,sessionId,channel,name,existing){
  else await page.locator('#v2-account-form [name=name]').fill(name);
  await page.locator('#v2-account-form [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});
 }
+async function openSourceReview(page,sessionId,index=0){
+ const state=await db(page),item=state.importWorkspace.attention[sessionId].filter(a=>a.kind==='SOURCE_UPDATE')[index];
+ const panel=page.locator(`[data-import-session="${sessionId}"]`);if(await panel.locator('details').count())await panel.locator('details').evaluate(e=>e.open=true);
+ await panel.locator(`[data-v2-attention="${item.id}"]`).click();await page.locator('#v2-source-form').waitFor();
+}
+async function submitSourceReview(page,mode){
+ await page.locator(`#v2-source-form [value=${mode}]`).check();await page.locator('#v2-source-form [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});
+}
 const wh='微信支付账单明细\n交易时间,交易类型,交易对方,商品,收/支,金额(元),支付方式,当前状态,交易单号\n';
 const ah='支付宝交易记录\n交易时间,交易分类,交易对方,商品说明,收/支,金额,收/付款方式,交易状态,交易订单号\n';
 const wx=wh+'2026-09-20 12:00:00,商户消费,咖啡店,咖啡,支出,20,零钱,支付成功,wx1\n2026-09-20 13:00:00,商户消费,书店,书,支出,30,零钱,支付成功,wx2\n2026-09-20 14:00:00,商户消费,超市,水果,支出,40,农业银行储蓄卡(2372),支付成功,wx3\n';
@@ -96,6 +104,41 @@ const ali=ah+'2026-09-21 12:00:00,餐饮美食,商户,午餐,支出,10,农业银
  assert.equal(plannedMovement.fields.account_id,entities(pendingState,'accounts')[0].id);assert.equal(plannedMovement.fields.amount,1000);
  assert.equal(pendingState.importWorkspace.attention[pendingSession].length,0);
  ok('Pending account answer persists a liability posting plan across reload without changing balances or consumption');
+ const settledSession=await upload(pendingPage,'settled.csv',ah+'2026-09-21 12:00:00,餐饮美食,商户,午餐,支出,10,花呗,交易成功,pending-1\n');
+ await openSourceReview(pendingPage,settledSession);await submitSourceReview(pendingPage,'APPLY_SOURCE');const settled=await db(pendingPage);
+ assert.equal(entities(settled,'transactions').length,1);assert.equal(entities(settled,'transactions')[0].status,'SUCCESS');assert.equal(entities(settled,'balance_movements').length,1);assert.equal(entities(settled,'balance_movements')[0].account_id,plannedMovement.fields.account_id);assert.equal(entities(settled,'balance_movements')[0].amount,1000);
+ ok('Explicitly adopting successful evidence settles the pending purchase once using its remembered liability account');
+ const reviewContext=await browser.newContext({viewport:{width:390,height:844}}),reviewPage=await reviewContext.newPage();reviewPage.on('pageerror',e=>errors.push(e.message));
+ await reviewPage.goto(baseUrl+'/#import');await reviewPage.locator('[data-action=import-file]').waitFor();
+ const sourceRow=amount=>`2026-09-20 12:00:00,商户消费,商户,商品,支出,${amount},,支付成功,review-order\n`;
+ await upload(reviewPage,'original.csv',wh+sourceRow(10));const change20=await upload(reviewPage,'changed.csv',wh+sourceRow(20));
+ await reviewPage.reload();await reviewPage.locator('[data-action=import-file]').waitFor();await openSourceReview(reviewPage,change20);
+ assert.equal(await reviewPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ await reviewPage.screenshot({path:'/tmp/star-source-review.png',fullPage:true});
+ await submitSourceReview(reviewPage,'KEEP_EXISTING');let reviewed=await db(reviewPage);
+ assert.equal(entities(reviewed,'transactions')[0].display_amount,1000);assert.equal(reviewed.importWorkspace.attention[change20].length,0);
+ const change30=await upload(reviewPage,'changed-again.csv',wh+sourceRow(30));await openSourceReview(reviewPage,change30);
+ const otherPage=await reviewContext.newPage();await otherPage.goto(baseUrl+'/#accounts');await otherPage.locator('[data-action=account]:visible').first().click();await otherPage.locator('#account-form [name=name]').fill('并发新账户');await otherPage.locator('#account-form [type=submit]').click();await otherPage.locator('dialog').waitFor({state:'hidden'});
+ await reviewPage.locator('#v2-source-form [value=APPLY_SOURCE]').check();await reviewPage.locator('#v2-source-form [type=submit]').click();
+ await reviewPage.waitForFunction(()=>document.querySelector('#toast').textContent.includes('重新打开来源核对'));
+ reviewed=await db(reviewPage);assert.equal(entities(reviewed,'transactions')[0].display_amount,1000);assert.equal(reviewed.importWorkspace.attention[change30].length,1);
+ await reviewPage.reload();await reviewPage.locator('[data-action=import-file]').waitFor();await openSourceReview(reviewPage,change30);await submitSourceReview(reviewPage,'APPLY_SOURCE');
+ reviewed=await db(reviewPage);assert.equal(entities(reviewed,'transactions').length,1);assert.equal(entities(reviewed,'transactions')[0].display_amount,3000);assert.equal(entities(reviewed,'source_records').length,3);
+ await reviewPage.reload();await reviewPage.locator('[data-action=import-file]').waitFor();const replayDecision=await upload(reviewPage,'decided.csv',wh+sourceRow(20));reviewed=await db(reviewPage);
+ assert.equal(reviewed.importWorkspace.attention[replayDecision].length,0);assert.equal(entities(reviewed,'transactions')[0].display_amount,3000);
+ ok('Source review survives reload, supports keep/apply, rejects stale cross-tab previews, and remembers exact-evidence decisions');
+ const groupPage=await(await browser.newContext()).newPage();groupPage.on('pageerror',e=>errors.push(e.message));await groupPage.goto(baseUrl+'/#import');await groupPage.locator('[data-action=import-file]').waitFor();
+ const groupSession=await upload(groupPage,'competing.csv',wh+sourceRow(10)+sourceRow(20));await openSourceReview(groupPage,groupSession,1);await submitSourceReview(groupPage,'APPLY_SOURCE');const groupState=await db(groupPage);
+ assert.equal(entities(groupState,'transactions').length,1);assert.equal(entities(groupState,'transactions')[0].display_amount,2000);assert.equal(groupState.importWorkspace.sessions[groupSession].skippedDuplicateCount,1);assert.equal(groupState.importWorkspace.attention[groupSession].length,0);
+ ok('Choosing one conflicting source snapshot posts it once and settles the alternative without losing either evidence');
+ const {InMemoryImportWorkspace}=await import('../packages/importing/workspace.ts');const {ImportStatementService}=await import('../packages/application/import-service.ts');const {resolveLegacyImportBatch}=await import('../apps/web/src/import-v2-flow.ts');
+ const recoveryWorkspace=new InMemoryImportWorkspace();await resolveLegacyImportBatch({drafts:parseRows(csv(wh+sourceRow(10))),sessionId:'interrupted',ledger:{entities:[],conflicts:[]},now:'2026-10-03T09:00:00Z',service:new ImportStatementService(recoveryWorkspace)});
+ const recoveryState=fresh();recoveryState.importWorkspace=recoveryWorkspace.snapshot();const recoveryPage=await(await browser.newContext()).newPage();recoveryPage.on('pageerror',e=>errors.push(e.message));await recoveryPage.goto(baseUrl+'/#import');await recoveryPage.locator('[data-action=import-file]').waitFor();
+ await recoveryPage.evaluate(state=>new Promise(resolve=>{const r=indexedDB.open('star-ledger-next-v1');r.onsuccess=()=>{const tx=r.result.transaction('ledger','readwrite');tx.objectStore('ledger').put(state,'main');tx.oncomplete=()=>{r.result.close();resolve();};};}),recoveryState);
+ await recoveryPage.reload();await recoveryPage.locator('[data-v2-resume=interrupted]').click();await recoveryPage.waitForFunction(()=>document.querySelector('#toast').textContent.includes('已恢复处理'));
+ const recovered=await db(recoveryPage);assert.equal(entities(recovered,'transactions').length,1);assert.equal(recovered.importWorkspace.sessions.interrupted.committedCount,1);
+ await recoveryPage.reload();await recoveryPage.locator('[data-action=import-file]').waitFor();assert.equal(await recoveryPage.locator('[data-v2-resume=interrupted]').count(),0);assert.equal(entities(await db(recoveryPage),'transactions').length,1);
+ ok('A captured PROCESSING session resumes after reload and commits once with correct durable outcomes');
  assert.deepEqual(errors,[]);
  fs.writeFileSync('/tmp/star-import-v09-validation.json',JSON.stringify({results,errors},null,2));
  }catch(e){if(page){console.error('TOAST',await page.locator('#toast').textContent());console.error((await page.locator('main').innerText()).slice(-2000));}throw e;}finally{await browser?.close();server.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

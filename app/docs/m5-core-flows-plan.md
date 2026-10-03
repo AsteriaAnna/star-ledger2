@@ -4,6 +4,8 @@
 
 > 当前进度（2026-10-03）：三项导入生命周期缺陷已修复，PENDING 账户回答已推进；M5.1 尚未完成。详见 [生命周期修复进度](m5-1-lifecycle-fixes-progress.md) 和 [完整验收计划](2026-10-03-project-review.md)。
 
+> 后续已接通部分来源决定和 PROCESSING/FAILED 继续处理入口，详见 [来源决定与恢复进度](m5-1-source-review-progress.md)。其他 typed Attention 与真实样本门槛仍保留。
+
 M5 只实现已经冻结的 M4 责任，不重新发明 Draft/workflow/blocker 状态机。
 
 ## M5.1 导入闭环

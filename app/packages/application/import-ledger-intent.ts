@@ -13,6 +13,8 @@ export const sourceIdentityNamespace=(source:ExternalRecord)=>[source.sourceSyst
 export const importedTransactionId=(source:ExternalRecord)=>'import-v2:'+sourceIdentityNamespace(source);
 export const importedSourceRecordId=(source:ExternalRecord)=>'source-v2:'+bytesToHex(sha256(new TextEncoder().encode(sourceIdentityNamespace(source)+'\n'+source.rawPayload)));
 
+export const sourceDecisionId=(source:ExternalRecord)=>'v2-source-decision:'+importedSourceRecordId(source).slice('source-v2:'.length);
+
 export function importSourcePayload(source:ExternalRecord){
  return JSON.stringify({
   version:3,

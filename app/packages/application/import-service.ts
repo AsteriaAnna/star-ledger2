@@ -1,5 +1,5 @@
 import {applyCommands,interpret} from '../accounting/business.ts';
-import {buildImportedLedgerIntent} from './import-ledger-intent.ts';
+import {buildImportedLedgerIntent,sourceDecisionId} from './import-ledger-intent.ts';
 import type {LedgerSnapshot} from '../accounting/index.ts';
 import {findSourceMatch} from '../importing/dedup.ts';
 import {createAttention,summarizeSession} from '../importing/attention.ts';
@@ -179,7 +179,7 @@ export class ImportStatementService {
   }
 
   const session=summarizeSession({...input.prepared.session,updatedAt:input.now},allAttention,input.now);
-  await this.workspace.saveSessionSnapshot(session,input.records,allAttention);
+  await this.workspace.saveSessionSnapshot(session,input.records,allAttention,input.prepared.records.map(r=>r.interpretation));
   return {session,records:resolved};
  }
  async prepare(input:PrepareImportInput):Promise<PrepareImportResult>{
@@ -225,7 +225,14 @@ export class ImportStatementService {
     allAttention.push(...items);prepared.push({externalRecordId:record.id,disposition:'NEEDS_ATTENTION',transactionId:null,interpretation,attention:items});continue;
    }
    const previous=previousRecords.find(r=>r.id===record.id&&keyOf(r)===batchKey&&r.rawPayload===record.rawPayload);
-   const unresolved=previous?previousAttention.filter(a=>a.externalRecordId===record.id):[];
+   const decisionId=sourceDecisionId(record);
+   const decision=input.ledger.entities.find(e=>e.type==='import_rules'&&e.id===decisionId);
+   const decisionConflict=input.ledger.conflicts.some(c=>c.entity_type==='import_rules'&&c.entity_id===decisionId);
+   const unresolved=previous?previousAttention.filter(a=>a.externalRecordId===record.id&&!(decision&&!decisionConflict&&a.kind==='SOURCE_UPDATE')):[];
+   if(decisionConflict){
+    const items=[createAttention({sessionId:input.sessionId,externalRecordId:record.id,kind:'SOURCE_UPDATE',question:'这份来源的处理决定存在同步冲突，需要先解决冲突',blocking:true,candidates:[],createdAt:input.now})];
+    allAttention.push(...items);prepared.push({externalRecordId:record.id,disposition:'NEEDS_ATTENTION',transactionId:null,interpretation,attention:items});continue;
+   }
    if(sourceMatch.activeTransactionIds.length===1&&unresolved.some(a=>a.kind==='SOURCE_UPDATE')){
     allAttention.push(...unresolved);prepared.push({externalRecordId:record.id,disposition:'SOURCE_UPDATE',transactionId:sourceMatch.activeTransactionIds[0],interpretation,attention:unresolved});continue;
    }
@@ -278,7 +285,7 @@ export class ImportStatementService {
   }
 
   const session=summarizeSession({...base,sourceCount:input.records.length,skippedDuplicateCount,noEffectCount,updatedAt:input.now},allAttention,input.now);
-  await this.workspace.saveSessionSnapshot(session,input.records,allAttention);
+  await this.workspace.saveSessionSnapshot(session,input.records,allAttention,input.interpretations);
   return {session,records:prepared};
  }
 }
