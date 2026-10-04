@@ -10,7 +10,6 @@ import type {Draft} from './importer.ts';
 import {hash} from './normalize.ts';
 export {hash} from './normalize.ts';
 import type {EncryptedProvider} from '../../../packages/sync/github.ts';
-import {GitHubSyncProvider} from '../../../packages/sync/github.ts';
 import {webSessionCrypto} from '../../../packages/platform/web-crypto.ts';
 import type {ImportWorkspaceSnapshot} from '../../../packages/importing/workspace.ts';
 export function validateImportWorkspace(value:unknown):ImportWorkspaceSnapshot{
@@ -68,19 +67,12 @@ export async function settings(values:Record<string,any>){return mutate(s=>{new 
 export async function saveImports(items:Draft[],expected:number){return mutate(s=>{if((s.state.importRevision||0)!==expected)throw Error('导入队列已在另一窗口更新，请刷新后重试');s.state.imports=structuredClone(items);s.state.importRevision=expected+1;});}
 function serializeBackup(s:State){return JSON.stringify({format:'star-ledger-web-backup',version:3,imports:s.imports||[],importWorkspace:s.importWorkspace??{sessions:{},records:{},attention:{},outcomes:{}},exportedAt:new Date().toISOString(),operations:s.ops,settings:s.settings},null,2);}
 export async function backup(){return serializeBackup(await read());}
-export async function originalLocalBackup(){return exclusive(async()=>{if(activeLedgerKey==='main')throw Error('请先登录云账户再迁移本地账本');const original=await new Promise<State|undefined>((resolve,reject)=>{const q=db.transaction('ledger').objectStore('ledger').get('main');q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);});if(!original||!original.ops.length)throw Error('原本地账本没有可迁移的记录');return serializeBackup(original);});}
 
 export async function restore(text:string){const b=JSON.parse(text);if(b.format!=='star-ledger-web-backup'||![1,2,3].includes(b.version)||!Array.isArray(b.operations)||b.operations.length>100000)throw Error('不是有效的星账新版备份');return mutate(s=>{const groups=new Map<string,Operation[]>();for(const op of b.operations){const g=groups.get(op.command_id)??[];g.push(op);groups.set(op.command_id,g);}const batches=[...groups.values()].map(ops=>{ops.sort((a,b)=>a.command_index-b.command_index);const body={version:1 as const,device:ops[0].device,seq:ops[0].seq,operations:ops};return {...body,checksum:hash(body)};});const accepted=structuredClone(s.state.batches);new PortableSyncEngine(s,new FakeSyncProvider(),hash).applyBatches(batches);s.state.batches=accepted;s.state.pending=[...new Set([...s.state.pending,...s.state.ops.map(o=>o.id)])];if(b.version>=2&&Array.isArray(b.imports)){if(b.imports.length>10000||!b.imports.every((d:any)=>d&&typeof d.key==='string'&&typeof d.raw==='string'&&['name','kind','status','date','amount','channel','platform','account','to','original','note','category'].every(k=>typeof d[k]==='string')&&(!d.blockers||Array.isArray(d.blockers)&&d.blockers.every((v:unknown)=>typeof v==='string'))&&(!d.confirmed||Array.isArray(d.confirmed)&&d.confirmed.every((v:unknown)=>typeof v==='string'))))throw Error('备份待办格式无效');const known=new Set((s.state.imports||[]).map(d=>d.itemId||d.key));s.state.imports=[...(s.state.imports||[]),...b.imports.filter((d:Draft)=>!known.has(d.itemId||d.key))];s.state.importRevision=(s.state.importRevision||0)+1;}if(b.version===3&&b.importWorkspace)s.state.importWorkspace=mergeImportWorkspace(s.state.importWorkspace,validateImportWorkspace(b.importWorkspace));if(b.settings&&typeof b.settings==='object'){const {budget,categories}=b.settings;if(budget===null||(Number.isSafeInteger(budget)&&budget>0))s.state.settings.budget=budget;if(Array.isArray(categories)&&categories.every(c=>typeof c==='string'&&c.length<60))s.state.settings.categories=categories;}});}
-/** Read-only migration: neither remote upload nor remote deletion is available here. */
-export async function readLegacyGitHub(config:{owner:string;repo:string;branch:string;ledger:string;token:string;key:string},progress:(s:string)=>void){
- const provider=new GitHubSyncProvider(config),cipher=await webSessionCrypto(config.ledger,config.key);await provider.healthCheck();const files=await provider.list();const imported=new MemoryStore(fresh());const batches:Batch[]=[];
- for(let i=0;i<files.length;i++){progress(`读取旧账 ${i+1} / ${files.length}`);const batch=await cipher.open(await provider.download(files[i]));if(files[i].path!==`ledger-sync/${config.ledger}/${batch.device}/${String(batch.seq).padStart(16,'0')}.json`)throw Error('REMOTE_PATH_MISMATCH');batches.push(batch);}
- new PortableSyncEngine(imported,new FakeSyncProvider(),hash).applyBatches(batches);return serializeBackup(imported.state);
-}
 export async function synchronizeEncrypted(config:{provider:EncryptedProvider;ledger:string;key:string;target:string;metadata?:Record<string,string>;uid?:string},progress:(s:string)=>void){return exclusive(async()=>{
  let state=await read();const target=config.target;
  if(config.uid&&(state.cloud?.uid!==config.uid||state.cloud?.ledger!==config.ledger||state.cloud?.recoveryKey!==config.key))throw Error('CLOUD_OWNER_MISMATCH');
- if(state.settings.syncTarget&&state.settings.syncTarget!==target)throw Error('此账本已绑定另一同步位置，请先完成迁移。');
+ if(state.settings.syncTarget&&state.settings.syncTarget!==target)throw Error('此账本与当前云同步位置不一致，请重新登录正确的账户。');
  const provider=config.provider;const cipher=await webSessionCrypto(config.ledger,config.key);await provider.healthCheck();
  // Persist every ciphertext before upload, and every acknowledgement after the remote write.
  let store=new MemoryStore(state);
