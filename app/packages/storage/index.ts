@@ -12,7 +12,7 @@ export class SqliteStore implements SyncStore {
   const exists=this.db.prepare("SELECT name FROM sqlite_master WHERE name='schema_version'").get();
   if(!exists) this.atomic(()=>this.db.exec(readFileSync(new URL('./migrations/001.sql',import.meta.url),'utf8')));
   const version=this.db.prepare('SELECT MAX(version) v FROM schema_version').get()?.v;
-  if(![1,2,3,4,5,6,7,8].includes(Number(version)))throw Error('UNSUPPORTED_SCHEMA');
+  if(![1,2,3,4,5,6,7,8,9].includes(Number(version)))throw Error('UNSUPPORTED_SCHEMA');
   const old=this.db.prepare('SELECT device_id FROM sync_devices').get();
   if(old && old.device_id!==device) throw Error('DEVICE_ID_MISMATCH');
   if(version===1)this.atomic(()=>this.db.exec(readFileSync(new URL('./migrations/002.sql',import.meta.url),'utf8')));
@@ -22,6 +22,7 @@ export class SqliteStore implements SyncStore {
   if(Number(version)<6)this.atomic(()=>this.db.exec(readFileSync(new URL('./migrations/006.sql',import.meta.url),'utf8')));
   if(Number(version)<7)this.atomic(()=>this.db.exec(readFileSync(new URL('./migrations/007.sql',import.meta.url),'utf8')));
   if(Number(version)<8)this.atomic(()=>this.db.exec(readFileSync(new URL('./migrations/008.sql',import.meta.url),'utf8')));
+  if(Number(version)<9)this.atomic(()=>this.db.exec(readFileSync(new URL('./migrations/009.sql',import.meta.url),'utf8')));
   this.db.prepare('INSERT OR IGNORE INTO sync_devices VALUES(?)').run(device);
   }catch(error){this.db.close();throw error;}
  }
@@ -37,7 +38,7 @@ export class SqliteStore implements SyncStore {
  }
  project(entities:Entity[],conflicts:Conflict[],versions:FieldVersion[]):void {
   // Prototype projection rebuild: never remove source evidence or physically delete facts.
-  const order:EntityType[]=['transactions','accounts','source_records','balance_movements','consumption_effects','transaction_links','balance_anchors','import_rules'];
+  const order:EntityType[]=['transactions','accounts','source_records','balance_movements','consumption_effects','transaction_links','balance_anchors','import_rules','ledger_settings'];
   for(const type of order)for(const e of entities.filter(e=>e.type===type)) {
    const keys=Object.keys(fields[type]);
    this.db.prepare(`INSERT INTO ${type}(id,${keys.join(',')}) VALUES(${keys.map(()=>'?').join(',')},?) ON CONFLICT(id) DO UPDATE SET ${keys.map(k=>`${k}=excluded.${k}`).join(',')}`).run(e.id,...keys.map(k=>e.fields[k] as string|number|null));

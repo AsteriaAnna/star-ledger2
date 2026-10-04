@@ -1,3 +1,4 @@
+import {ledgerSettings,planLedgerSettings,planLegacyLedgerSettings} from '../../../packages/application/ledger-settings.ts';
 import type {Operation,Entity,EntityType,Batch,Conflict,FieldVersion} from '../../../packages/domain/index.ts';
 import type {SyncStore} from '../../../packages/platform/ports.ts';
 import type {BusinessCommand} from '../../../packages/domain/accounting.ts';
@@ -38,11 +39,11 @@ export type State={version:2;imports?:Draft[];importRevision?:number;importWorks
 export const fresh=():State=>({version:2,imports:[],importRevision:0,importWorkspace:{sessions:{},records:{},attention:{},outcomes:{}},revision:0,device:crypto.randomUUID(),ops:[],pending:[],batches:[],envelopes:{},settings:{budget:300000,categories:['餐饮','购物','交通','生活','娱乐','学习','医疗','其他'],mode:'auto'}});
 export class MemoryStore implements SyncStore {
  state:State;entities:Entity[];conflicts:Conflict[];
- constructor(state:State){this.state=structuredClone(state);const p=project(state.ops);this.entities=p.entities;this.conflicts=p.conflicts;}
+ constructor(state:State){this.state=structuredClone(state);const p=project(state.ops);this.entities=p.entities;this.conflicts=p.conflicts;this.state.settings=ledgerSettings(p,this.state.settings);}
  atomic<T>(fn:()=>T):T{const s=structuredClone(this.state),e=this.entities,c=this.conflicts;try{return fn();}catch(err){this.state=s;this.entities=e;this.conflicts=c;throw err;}}
  allOperations(){return structuredClone(this.state.ops);}
  append(op:Operation,local:boolean){this.state.ops.push(structuredClone(op));if(local)this.state.pending.push(op.id);}
- project(entities:Entity[],conflicts:Conflict[],_v:FieldVersion[]){this.entities=entities;this.conflicts=conflicts;}
+ project(entities:Entity[],conflicts:Conflict[],_v:FieldVersion[]){this.entities=entities;this.conflicts=conflicts;this.state.settings=ledgerSettings({entities,conflicts},this.state.settings);}
  get(type:EntityType,id:string){return this.entities.find(e=>e.type===type&&e.id===id);}
  pendingOperations(){const ids=new Set(this.state.pending);return this.state.ops.filter(o=>ids.has(o.id));}
  acknowledgeOperations(ids:string[]){const set=new Set(ids);this.state.pending=this.state.pending.filter(id=>!set.has(id));}
@@ -54,13 +55,13 @@ export class MemoryStore implements SyncStore {
 }
 let db:IDBDatabase;let queue=Promise.resolve();
 export async function openStore(){db=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open('star-ledger-next-v1',2);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('ledger'))r.result.createObjectStore('ledger');};r.onblocked=()=>reject(Error('请关闭其他星账页面，再重新打开以完成升级'));r.onsuccess=()=>{r.result.onversionchange=()=>r.result.close();resolve(r.result);};r.onerror=()=>reject(r.error);});const current=await read();if(!current)await write(fresh(),-1);else if(Number(current.version)<2)await write({...current,version:2,imports:[],importRevision:0},current.revision);else if(current.version!==2)throw Error('不支持此数据版本，请更新星账');}
-export async function read():Promise<State>{return new Promise((resolve,reject)=>{const r=db.transaction('ledger').objectStore('ledger').get('main');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
+export async function read():Promise<State>{return new Promise((resolve,reject)=>{const r=db.transaction('ledger').objectStore('ledger').get('main');r.onsuccess=()=>{try{const state=r.result;if(state)state.settings=ledgerSettings(project(state.ops),state.settings);resolve(state);}catch(e){reject(e);}};r.onerror=()=>reject(r.error);});}
 async function write(state:State,expected:number){return new Promise<void>((resolve,reject)=>{const tx=db.transaction('ledger','readwrite');const s=tx.objectStore('ledger');const r=s.get('main');let reason:Error|undefined;r.onsuccess=()=>{if((r.result?.revision??-1)!==expected){reason=Error('账本已在其他窗口更新，请重试');tx.abort();return;}s.put({...state,revision:expected+1},'main');};tx.oncomplete=()=>resolve();tx.onabort=()=>reject(reason??tx.error??Error('保存失败'));tx.onerror=()=>reject(tx.error);});}
 export function exclusive<T>(fn:()=>Promise<T>):Promise<T>{const run=()=>navigator.locks?navigator.locks.request('star-ledger-next-write',fn):fn();const p=queue.then(run,run);queue=p.then(()=>{},()=>{});return p;}
 export async function mutate(fn:(store:MemoryStore)=>void){return exclusive(async()=>{const s=await read();const store=new MemoryStore(s);fn(store);await write(store.state,s.revision);});}
 export async function business(command:BusinessCommand){return mutate(s=>{new BusinessAccountingService(s,s.state.device).execute(command);});}
 export async function raw(commands:Command[]){return mutate(s=>{new AccountingService(s,s.state.device).execute(commands);});}
-export async function settings(values:Record<string,any>){return mutate(s=>{Object.assign(s.state.settings,values);});}
+export async function settings(values:Record<string,any>){return mutate(s=>{new AccountingService(s,s.state.device).execute(snapshot=>planLedgerSettings(values,snapshot));const local=Object.fromEntries(Object.entries(values).filter(([key])=>!['budget','categories'].includes(key)));Object.assign(s.state.settings,local);});}
 export async function saveImports(items:Draft[],expected:number){return mutate(s=>{if((s.state.importRevision||0)!==expected)throw Error('导入队列已在另一窗口更新，请刷新后重试');s.state.imports=structuredClone(items);s.state.importRevision=expected+1;});}
 export async function backup(){const s=await read();return JSON.stringify({format:'star-ledger-web-backup',version:3,imports:s.imports||[],importWorkspace:s.importWorkspace??{sessions:{},records:{},attention:{},outcomes:{}},exportedAt:new Date().toISOString(),operations:s.ops,settings:s.settings},null,2);}
 export async function restore(text:string){const b=JSON.parse(text);if(b.format!=='star-ledger-web-backup'||![1,2,3].includes(b.version)||!Array.isArray(b.operations)||b.operations.length>100000)throw Error('不是有效的星账新版备份');return mutate(s=>{const groups=new Map<string,Operation[]>();for(const op of b.operations){const g=groups.get(op.command_id)??[];g.push(op);groups.set(op.command_id,g);}const batches=[...groups.values()].map(ops=>{ops.sort((a,b)=>a.command_index-b.command_index);const body={version:1 as const,device:ops[0].device,seq:ops[0].seq,operations:ops};return {...body,checksum:hash(body)};});new PortableSyncEngine(s,new FakeSyncProvider(),hash).applyBatches(batches);s.state.pending=[...new Set([...s.state.pending,...s.state.ops.map(o=>o.id)])];if(b.version>=2&&Array.isArray(b.imports)){if(b.imports.length>10000||!b.imports.every((d:any)=>d&&typeof d.key==='string'&&typeof d.raw==='string'&&['name','kind','status','date','amount','channel','platform','account','to','original','note','category'].every(k=>typeof d[k]==='string')&&(!d.blockers||Array.isArray(d.blockers)&&d.blockers.every((v:unknown)=>typeof v==='string'))&&(!d.confirmed||Array.isArray(d.confirmed)&&d.confirmed.every((v:unknown)=>typeof v==='string'))))throw Error('备份待办格式无效');const known=new Set((s.state.imports||[]).map(d=>d.itemId||d.key));s.state.imports=[...(s.state.imports||[]),...b.imports.filter((d:Draft)=>!known.has(d.itemId||d.key))];s.state.importRevision=(s.state.importRevision||0)+1;}if(b.version===3&&b.importWorkspace)s.state.importWorkspace=mergeImportWorkspace(s.state.importWorkspace,validateImportWorkspace(b.importWorkspace));if(b.settings&&typeof b.settings==='object'){const {budget,categories}=b.settings;if(budget===null||(Number.isSafeInteger(budget)&&budget>0))s.state.settings.budget=budget;if(Array.isArray(categories)&&categories.every(c=>typeof c==='string'&&c.length<60))s.state.settings.categories=categories;}});}
@@ -76,6 +77,7 @@ export async function synchronize(config:{owner:string;repo:string;branch:string
  for(const known of store.knownBatches())if(!priorBatches.some(b=>b.device===known.device&&b.seq===known.seq&&b.checksum===known.checksum))throw Error('REMOTE_HISTORY_MISSING');
  new PortableSyncEngine(store,new FakeSyncProvider(),hash).applyBatches(priorBatches);
  for(const b of priorBatches){store.acknowledgeOperations(b.operations.map(o=>o.id));}
+ new AccountingService(store,store.state.device).execute(snapshot=>planLegacyLedgerSettings(state.settings,snapshot));
  store.state.settings.syncTarget=target;
  await write(store.state,state.revision);state=await read();store=new MemoryStore(state);
  const core=new PortableSyncEngine(store,new FakeSyncProvider(),hash);

@@ -26,7 +26,7 @@ export function project(ops:Operation[]) {
   if(!creates.length)throw Error('EDIT_BEFORE_CREATE');
   if(creates.length>1) {
    const type=creates[0].entity.type;
-   const sharedRule=type==='import_rules'&&creates.every(o=>o.entity.fields.rule_key===creates[0].entity.fields.rule_key);
+   const sharedRule=(type==='import_rules'&&creates.every(o=>o.entity.fields.rule_key===creates[0].entity.fields.rule_key))||(type==='ledger_settings'&&creates.every(o=>o.entity.fields.setting_key===creates[0].entity.fields.setting_key));
    const derived=['balance_movements','consumption_effects','transaction_links'].includes(type);
    const sameSource=type==='source_records'&&creates.every(o=>JSON.stringify(o.entity.fields)===JSON.stringify(creates[0].entity.fields));
    const concurrent=creates.every(a=>creates.every(b=>a===b||(!before(a,b)&&!before(b,a))));
