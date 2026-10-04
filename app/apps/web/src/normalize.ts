@@ -1,11 +1,11 @@
 import {sha256} from '@noble/hashes/sha256';
 import {bytesToHex} from '@noble/hashes/utils';
 export const hash=(v:unknown)=>bytesToHex(sha256(new TextEncoder().encode(JSON.stringify(v))));
-export function money(value:string):number{
+export function money(value:string,allowZero=false):number{
  const s=value.trim().replace(/^[¥￥]\s*/,'').replace(/\s*元$/,'').trim();
  if(!/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/.test(s))throw Error('金额需要是最多两位小数的正数');
  const [a,b='']=s.replace(/,/g,'').split('.');const n=Number(a)*100+Number(b.padEnd(2,'0'));
- if(!Number.isSafeInteger(n)||n<=0)throw Error('请输入有效金额');return n;
+ if(!Number.isSafeInteger(n)||n<0||!allowZero&&n===0)throw Error('请输入有效金额');return n;
 }
 export function wallDate(value:string|Date){
  const raw=value instanceof Date?value.toISOString().slice(0,19):value.trim();

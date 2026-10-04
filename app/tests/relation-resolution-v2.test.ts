@@ -25,7 +25,7 @@ test('unlinked refund remains a valid unresolved relation, not a blocking accoun
  assert.equal(result.state,'UNRESOLVED');assert.equal(result.originalId,null);
 });
 
-test('missing strong order match may fall back only to a weak suggestion',()=>{
+test('missing explicit original order does not suggest a different merchant-match purchase',()=>{
  const result=resolveRefundRelation({...input,originalOrderId:'missing-order'},[tx('t1')]);
- assert.equal(result.state,'SUGGESTED');assert.equal(result.originalId,null);assert.equal(result.evidence,'MERCHANT_AMOUNT_TIME');
+ assert.equal(result.state,'UNRESOLVED');assert.equal(result.originalId,null);assert.equal(result.evidence,'ORIGINAL_ORDER');assert.deepEqual(result.candidates,[]);
 });

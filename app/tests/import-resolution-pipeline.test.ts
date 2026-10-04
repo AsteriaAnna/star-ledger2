@@ -71,9 +71,35 @@ test('repayment preserves the known event while unresolved liability endpoint be
  assert.equal(result.records[0].ledgerState,'READY_FOR_LEDGER');assert.equal(result.records[0].attention.find(x=>x.kind==='TRANSFER_ENDPOINTS')?.blocking,false);
 });
 
-test('strong refund relation still blocks when partial-consumption allocation is genuinely ambiguous',async()=>{
+test('strong refund relation records known arrival while consumption allocation remains a nonblocking question',async()=>{
  const r=record('refund-partial',{sourceSystem:'WECHAT',platformRaw:'微信',facts:{...record('x').facts,channelRaw:'/',transactionTypeRaw:'商户退款',directionRaw:'收入',amountFen:200,orderId:'refund-partial',refundId:'refund-partial',originalOrderId:'paid'}});
  const entities=[tx('t1','PURCHASE',1000),sourceEvidence('src','t1','paid'),{type:'consumption_effects',id:'t1:effect',fields:{transaction_id:'t1',amount:600,category_id:'购物',subcategory_id:null,effective_at:'2026-09-01T00:00:00Z',created_at:'2026-09-01T00:00:00Z'}} as Entity];
  const result=await pipeline(r,interpretation(r.id,{eventKind:'REFUND',amountFen:200,channelRaw:'/'}),entities);
- assert.equal(result.records[0].relation?.state,'RESOLVED');assert.equal(result.records[0].ledgerState,'NEEDS_ATTENTION');assert.equal(result.records[0].attention.find(x=>x.kind==='CONSUMPTION_ALLOCATION')?.blocking,true);
+ assert.equal(result.records[0].relation?.state,'RESOLVED');assert.equal(result.records[0].ledgerState,'READY_FOR_LEDGER');assert.equal(result.records[0].attention.find(x=>x.kind==='CONSUMPTION_ALLOCATION')?.blocking,false);
+});
+
+test('revival resolves funding instead of rebuilding a known payer as null',async()=>{
+ const r=record('revive'),original={...tx('old'),fields:{...tx('old').fields,deleted_at:'2026-10-01T00:00:00Z'}};
+ const evidence={...sourceEvidence('sr','old','revive'),fields:{...sourceEvidence('sr','old','revive').fields,platform:'支付宝',raw_payload:JSON.stringify({identity:'revive',profile:'本人',original:'{}'})}};
+ const out=await pipeline(r,interpretation(r.id),[original,evidence,account('wallet','支付宝余额')]);
+ assert.equal(out.records[0].disposition,'REVIVE_EXISTING');assert.equal(out.records[0].account?.accountId,'wallet');assert.equal(out.records[0].ledgerState,'READY_FOR_LEDGER');
+});
+test('revival does not bypass split-payment or invalid amount attention',async()=>{
+ const original={...tx('old'),fields:{...tx('old').fields,deleted_at:'2026-10-01T00:00:00Z'}};
+ const evidence={...sourceEvidence('sr','old','revive'),fields:{...sourceEvidence('sr','old','revive').fields,platform:'支付宝',raw_payload:JSON.stringify({identity:'revive',profile:'本人',original:'{}'})}};
+ const r=record('revive');r.facts.channelRaw='余额 + 农业银行储蓄卡(2372)';
+ const split=await pipeline(r,interpretation(r.id),[original,evidence]);assert.equal(split.records[0].ledgerState,'NEEDS_ATTENTION');assert.ok(split.records[0].attention.some(a=>a.kind==='SPLIT_PAYMENT'));
+ const invalid=await pipeline(r,interpretation(r.id,{amountFen:null}),[original,evidence]);assert.equal(invalid.records[0].ledgerState,'NEEDS_ATTENTION');assert.ok(invalid.records[0].attention.some(a=>a.kind==='AMOUNT'));
+});
+
+test('same-batch refund resolves its original even when the refund row comes first',async()=>{
+ const original=record('buy');original.facts.channelRaw='余额';
+ const refund=record('refund');refund.facts.orderId='buy*REFUND_1';refund.facts.amountFen=200;refund.facts.occurredAt='2026-09-21T04:00:00Z';
+ const service=new ImportStatementService(new InMemoryImportWorkspace()),ledger={entities:[account('wallet','支付宝余额')],conflicts:[]};
+ const records=[refund,original],interpretations=[interpretation('refund',{eventKind:'REFUND',amountFen:200,occurredAt:refund.facts.occurredAt}),interpretation('buy')];
+ const prepared=await service.prepare({sessionId:'s',sourceType:'EXCEL',sourceSystem:'ALIPAY',records,interpretations,ledger,now:'2026-10-02T00:00:00Z'});
+ const result=await service.resolve({prepared,records,ledger,now:'2026-10-02T00:00:00Z'});
+ const resolved=result.records.find(r=>r.externalRecordId==='refund')!;
+ assert.equal(resolved.relation?.state,'RESOLVED');assert.equal(resolved.relation?.evidence,'ORIGINAL_ORDER');assert.equal(resolved.ledgerState,'READY_FOR_LEDGER');
+ assert.equal(ledger.entities.length,1); // planning must not mutate the persisted ledger
 });

@@ -1,6 +1,14 @@
 # 星账 · 网页个人版 0.9
 
-本版提供同一链接的电脑和手机界面，批量导入按渠道集中设置账户，亲情卡免逐笔确认，退款支持先入账后关联。当前规则与验证说明见 `docs/import-v0.9.md`；旧版发布记录保留在 docs 中。
+## 当前维护入口
+
+当前主线为 `app/` 个人版；GitHub 管理源码，CloudBase（上海）承载网站、认证与个人账本同步。旧双人包 `../legacy-duo/` 只读参考，不参与当前构建。先读[职责契约](docs/responsibility-contract.md)和[M1–M7 执行计划](docs/m1-m7-execution-plan.md)，具体目录、分支及发布状态见[维护记录](docs/2026-10-05-maintenance-baseline.md)。
+
+当前网站已部署到 CloudBase，生产构建包含同源 OCR 资源。代码通过本地验证不等于真实云同步完成：注册入口尚未实现，真实登录、数据库读写、双客户端同步与恢复仍待验收。旧 GitHub / 本机迁移入口已撤下；新账本备份、恢复和换设备继续保留。
+
+用户确认顺序：主分支维护 → 用户名密码注册与登录 → 真实同步和恢复 → 收集真实 OCR 样本并验证导入 → 双人版 → 安卓发布；iOS 暂缓。双人具体设定后续讨论，账户编辑应提前落实。安卓需实现系统截图分享接收，网页选择图片不能代替系统分享能力。
+
+以下旧版本章节和[Pages 体验检查点](docs/m5-preview-progress.md)保留为历史资料，不代表当前线上版本或下一项任务。
 
 ```sh
 npm ci
@@ -11,7 +19,7 @@ npm run typecheck:web
 npm run test:web:imports
 ```
 
-浏览器验收：安装 Playwright 浏览器后运行 `npm run test:web`。也可通过 `CHROMIUM_EXECUTABLE` 指定测试浏览器路径。生成的 `web-dist` 可直接发布到 GitHub Pages 子目录。
+当前浏览器验收：安装 Playwright 浏览器后运行 `npm run test:web:imports`；`test:web` 为旧界面历史脚本，不作为当前验收入口。也可通过 `CHROMIUM_EXECUTABLE` 指定测试浏览器路径。生成的 `web-dist` 用于 CloudBase 静态托管；构建只处理当前源码，不再拉取另一提交追加预览。
 
 ## 底层阶段记录（历史文档）
 

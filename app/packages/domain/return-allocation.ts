@@ -25,11 +25,20 @@ export function resolveReturnAllocation(input:ReturnAllocationInput):ReturnAlloc
   if(input.originalConsumption===0)reduction=0;
   else if(input.originalConsumption===input.originalAmount)reduction=input.amount;
   else if(input.amount===input.originalAmount&&input.previousReturned===0)reduction=input.originalConsumption;
-  else return {state:'NEEDS_ALLOCATION',reason:'原交易只有部分金额计入消费，需要确认本次退款冲减多少消费'};
+  else {const bounds=returnAllocationBounds(input);if(bounds.minimum!==bounds.maximum)return {state:'NEEDS_ALLOCATION',reason:'原交易只有部分金额计入消费，需要确认本次退款冲减多少消费'};reduction=bounds.minimum;}
  }
  if(!safe(reduction))throw Error('INVALID_MONEY');
  if(reduction>input.amount||add(input.previousReduction,reduction)>input.originalConsumption)throw Error('REFUND_CONSUMPTION_EXCEEDED');
  const nonConsumed=input.originalAmount-input.originalConsumption;
  if(add(input.previousReturned-input.previousReduction,input.amount-reduction)>nonConsumed)throw Error('REFUND_NONCONSUMPTION_EXCEEDED');
  return {state:'RESOLVED',reduction};
+}
+
+/** The exact feasible interval; arithmetic and validity stay in the domain. */
+export function returnAllocationBounds(input:Omit<ReturnAllocationInput,'requestedReduction'>){
+ const minimum=Math.max(0,input.amount-(input.originalAmount-input.originalConsumption-(input.previousReturned-input.previousReduction)));
+ const maximum=Math.min(input.amount,input.originalConsumption-input.previousReduction);
+ resolveReturnAllocation({...input,requestedReduction:minimum});
+ if(maximum<minimum)throw Error('INVALID_RETURN_ALLOCATION');
+ return {minimum,maximum};
 }

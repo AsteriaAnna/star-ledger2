@@ -29,7 +29,7 @@ function mappingCommand(entities:Entity[],id:string,payload:unknown):Command{
  const value=JSON.stringify(payload);
  return old?{action:'PATCH_FIELD',entity:{type:'import_rules',id,fields:{value}}}:{action:'CREATE_ENTITY',entity:{type:'import_rules',id,fields:{rule_key:id,value}}};
 }
-export const rememberAccountMappingCommand=(entities:Entity[],key:AccountIdentity,mapping:AccountMapping)=>mappingCommand(entities,accountMappingKey(key),mapping);
+export const rememberAccountMappingCommand=(entities:Entity[],key:AccountIdentity,mapping:AccountMapping)=>mappingCommand(entities,accountMappingKey(key),{...mapping,identity:key});
 export const rememberMerchantCategoryCommand=(entities:Entity[],key:MerchantIdentity,mapping:CategoryMapping)=>mappingCommand(entities,merchantCategoryKey(key),mapping);
 
 
@@ -62,6 +62,7 @@ export function legacyAccountMemoryMigrations(entities:Entity[],migratedAt:strin
 
 export function legacyAccountMemoryMigrationCommands(entities:Entity[],migratedAt:string):Command[]{
  return legacyAccountMemoryMigrations(entities,migratedAt)
-  .filter(value=>!readAccountMapping(entities,value.key))
+  // A tombstone is an explicit forget decision, not missing memory to recreate.
+  .filter(value=>!entities.some(e=>e.type==='import_rules'&&e.id===accountMappingKey(value.key)))
   .map(value=>rememberAccountMappingCommand(entities,value.key,value.mapping));
 }

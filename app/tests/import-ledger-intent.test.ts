@@ -21,7 +21,7 @@ test('ready purchase with unknown account creates unresolved movement rather tha
  assert.equal(out.record.ledgerState,'READY_FOR_LEDGER');
  const intent=buildImportedLedgerIntent({resolved:out.record,source:r});
  assert.equal(intent.kind,'PURCHASE');if(intent.kind!=='PURCHASE')return;
- assert.equal(intent.payer,null);assert.equal(intent.funding,'OWN');assert.equal(intent.categoryId,undefined);
+ assert.equal(intent.payer,null);assert.equal(intent.funding,'OWN');assert.equal(intent.categoryId,'购物');
  const commands=interpret(intent,out.ledger);
  const movement=commands.find(x=>x.entity.type==='balance_movements')!.entity;
  assert.equal(movement.fields.account_id,null);
@@ -63,4 +63,12 @@ test('recognized repayment reaches ledger with unresolved liability endpoint ins
  assert.equal(out.record.ledgerState,'READY_FOR_LEDGER');assert.equal(out.record.attention.some(x=>x.kind==='TRANSFER_ENDPOINTS'&&x.blocking),false);
  const intent=buildImportedLedgerIntent({resolved:out.record,source:r});assert.equal(intent.kind,'REPAYMENT');
  if(intent.kind==='REPAYMENT'){assert.equal(intent.to,null);}
+});
+
+
+test('changed raw evidence keeps transaction identity but gets a new immutable SourceRecord id',async()=>{
+ const first=record('evolving'),second={...record('evolving'),rawPayload:'{"status":"updated"}'};
+ assert.equal(importedTransactionId(first),importedTransactionId(second));
+ assert.notEqual(importedSourceRecordId(first),importedSourceRecordId(second));
+ assert.equal(importedSourceRecordId(first),importedSourceRecordId({...first}));
 });
