@@ -1,3 +1,5 @@
+import {createAttention} from '../../../packages/importing/attention.ts';
+import {identicalInterpretation} from './import-workflow.ts';
 import {finalizeImportRefunds} from './import-refund-finalize.ts';
 import type {LedgerSnapshot} from '../../../packages/accounting/index.ts';
 import {ImportStatementService,type ResolveImportResult} from '../../../packages/application/import-service.ts';
@@ -45,6 +47,19 @@ export async function resolveLegacyImportBatch(input:{
   sessionId:input.sessionId,sourceType:records[0].sourceType,sourceSystem:records[0].sourceSystem,
   records,interpretations,ledger:input.ledger,now:input.now
  });
+ // Preserve the retired queue's explicit review of legacy interpretations.
+ // Modern evidence already uses the service's source-update policy.
+ for(const row of prepared.records){
+  if(row.disposition!=='SKIP_DUPLICATE'||!row.transactionId)continue;
+  const index=records.findIndex(record=>record.id===row.externalRecordId),draft=input.drafts[index];
+  const target=input.ledger.entities.find(e=>e.type==='transactions'&&e.id===row.transactionId);
+  const evidence=input.ledger.entities.filter(e=>e.type==='source_records'&&e.fields.transaction_id===row.transactionId);
+  const versions=evidence.map(e=>{try{return JSON.parse(String(e.fields.raw_payload)).version;}catch{return null;}});
+  if(!draft||!target||!versions.includes(2)||versions.includes(3)||identicalInterpretation(draft,target))continue;
+  row.disposition='SOURCE_UPDATE';
+  row.attention=[createAttention({sessionId:input.sessionId,externalRecordId:row.externalRecordId,kind:'SOURCE_UPDATE',question:'来源与已有账单不同，是否采用来源信息？',blocking:true,candidates:[{id:target.id,label:String(target.fields.display_name)}],createdAt:input.now})];
+  prepared.session.skippedDuplicateCount--;
+ }
  const result=await input.service.resolve({prepared,records,ledger:input.ledger,now:input.now});
  return {records,result,plan:planImportCommit(result,records)};
 }

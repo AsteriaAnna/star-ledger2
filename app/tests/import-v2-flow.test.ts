@@ -30,3 +30,13 @@ test('split funding with unknown allocation remains the explicit blocking except
  assert.equal(out.result.records[0].attention.some(item=>item.kind==='SPLIT_PAYMENT'&&item.blocking),true);
  assert.deepEqual(out.plan.blockedRecordIds,['s:observation:0']);
 });
+
+test('retired legacy source review moves into the current explicit source-answer flow',async()=>{
+ const d=draft(),base={entities:[{type:'transactions',id:'old',fields:{event_type:'INCOME',status:'SUCCESS',display_amount:2500,occurred_at:'2026-10-01T10:00:00.000Z',display_name:'旧解释'}},{type:'source_records',id:'old-evidence',fields:{transaction_id:'old',platform:'微信',raw_payload:JSON.stringify({version:2,identity:d.identity,profile:'本人',order:d.order,original:d.raw})}}],conflicts:[]} as any;
+ const out=await resolveLegacyImportBatch({drafts:[d],sessionId:'legacy-review',ledger:base,now,service:new ImportStatementService(new InMemoryImportWorkspace())});
+ assert.equal(out.result.records[0].disposition,'SOURCE_UPDATE');assert.equal(out.result.records[0].transactionId,'old');assert.equal(out.result.records[0].attention[0].kind,'SOURCE_UPDATE');assert.equal(out.result.session.skippedDuplicateCount,0);assert.equal(out.plan.newRecords.length,0);
+ // Current evidence must retain its normal reimport policy even after user edits.
+ base.entities[1].fields.raw_payload=JSON.stringify({version:3,identity:d.identity,profile:'本人',order:d.order,original:d.raw});
+ const modern=await resolveLegacyImportBatch({drafts:[d],sessionId:'modern-repeat',ledger:base,now,service:new ImportStatementService(new InMemoryImportWorkspace())});
+ assert.equal(modern.result.records[0].disposition,'SKIP_DUPLICATE');assert.deepEqual(modern.result.records[0].attention,[]);
+});

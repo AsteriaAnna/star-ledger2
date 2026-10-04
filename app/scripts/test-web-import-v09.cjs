@@ -50,6 +50,7 @@ const ali=ah+'2026-09-21 12:00:00,餐饮美食,商户,午餐,支出,10,农业银
  let s=await db(page);assert.equal(entities(s,'transactions').length,3);assert.equal(s.imports.length,0);
  assert.equal(entities(s,'transactions')[0].occurred_at,'2026-09-20T04:00:00.000Z');
  assert.equal(s.importWorkspace.sessions[wxSession].committedCount,3);assert.equal(s.importWorkspace.attention[wxSession].length,3);
+ assert.equal(await page.locator(`[data-import-session="${wxSession}"] [data-v2-attention]`).count(),2);
  const originalSources=entities(s,'source_records'),originalEffects=entities(s,'consumption_effects');
  await answerAccount(page,wxSession,'零钱','日常零钱');await answerAccount(page,wxSession,'农业银行储蓄卡(2372)','',bank);
  s=await db(page);assert.equal(entities(s,'accounts').length,2);assert.equal(s.importWorkspace.attention[wxSession].length,0);
@@ -86,7 +87,8 @@ const ali=ah+'2026-09-21 12:00:00,餐饮美食,商户,午餐,支出,10,农业银
  assert.equal(s.importWorkspace.sessions[splitSession].committedCount,0);assert.equal(s.importWorkspace.attention[splitSession][0].kind,'SPLIT_PAYMENT');
  const evidence=s.importWorkspace.records[splitSession];await page.reload();await page.locator('[data-action=import-file]').waitFor();
  await upload(page,'later.csv',wx.replaceAll('wx1','wx7').replaceAll('wx2','wx8').replaceAll('wx3','wx9'));
- assert.equal(await page.locator(`[data-import-session="${splitSession}"] [data-v2-attention]`).count(),1);
+ assert.equal(await page.locator(`[data-import-session="${splitSession}"] .attention-list .import-row`).count(),1);
+ assert.equal(await page.locator(`[data-import-session="${splitSession}"] [data-v2-attention]`).count(),0);
  assert.deepEqual((await db(page)).importWorkspace.records[splitSession],evidence);ok('Blocked split source survives reload and remains accessible after newer imports');
  // A refund arriving after a separately committed original still uses strong relation evidence.
  const refund=ah+'2026-09-24 12:00:00,餐饮美食,商户,退款-午餐,不计收支,1,农业银行储蓄卡(2372),退款成功,a1*REFUND_2\n';
@@ -101,7 +103,7 @@ const ali=ah+'2026-09-21 12:00:00,餐饮美食,商户,午餐,支出,10,农业银
  const draft={...parseRows(csv(legacyText))[0],kind:'PURCHASE',parserVersion:2,workflow:'committed',transactionId:'legacy',account:'bank'};
  const rawPayload=JSON.stringify(sourcePayload(draft));service.execute({kind:'PURCHASE',id:'legacy',name:'旧还款',note:'保留备注',amount:3000,payer:'bank',categoryId:'其他',occurredAt:'2026-09-21T07:00:00.000Z',source:{id:'legacy-source',sourceType:'EXCEL',platform:'支付宝',rawPayload}});legacy.state.imports=[{...parseRows(csv(legacyText))[0],workflow:'linked',transactionId:'legacy',account:'bank'}];
  const oldContext=await browser.newContext();const oldPage=await oldContext.newPage();await oldPage.goto(baseUrl+'/#import');await oldPage.locator('[data-action=import-file]').waitFor();await oldPage.evaluate(state=>new Promise(resolve=>{const r=indexedDB.open('star-ledger-next-v1');r.onsuccess=()=>{const tx=r.result.transaction('ledger','readwrite');tx.objectStore('ledger').put(state,'main');tx.oncomplete=()=>{r.result.close();resolve();};};}),legacy.state);await oldPage.reload();await oldPage.locator('[data-action=import-file]').waitFor();
- assert.equal(entities(await db(oldPage),'transactions')[0].event_type,'PURCHASE');await oldPage.locator('#import-show').selectOption('linked');await oldPage.locator('[data-source-review]').click();await oldPage.locator('#source-change-form [type=submit]').click();await oldPage.locator('#confirm-form [type=submit]').click();await oldPage.locator('dialog').waitFor({state:'hidden'});
+ assert.equal(entities(await db(oldPage),'transactions')[0].event_type,'PURCHASE');const legacySession=await upload(oldPage,'legacy-repay.csv',legacyText);await openSourceReview(oldPage,legacySession);await submitSourceReview(oldPage,'APPLY_SOURCE');
  const corrected=await db(oldPage);assert.equal(entities(corrected,'transactions').length,1);assert.equal(entities(corrected,'transactions')[0].event_type,'REPAYMENT');assert.equal(entities(corrected,'transactions')[0].note,'保留备注');assert.equal(entities(corrected,'consumption_effects')[0].amount,0);assert.equal(entities(corrected,'source_records').find(e=>e.id==='legacy-source').raw_payload,rawPayload);assert.equal(entities(corrected,'balance_movements').filter(e=>e.account_id==='bank').reduce((n,e)=>n+e.amount,0),-3000);ok('Legacy reimport previews and explicitly corrects purchase to repayment without duplicate debit or lost evidence');
  const pendingContext=await browser.newContext(),pendingPage=await pendingContext.newPage();pendingPage.on('pageerror',e=>errors.push(e.message));
  await pendingPage.goto(baseUrl+'/#import');await pendingPage.locator('[data-action=import-file]').waitFor();
@@ -163,6 +165,7 @@ const ali=ah+'2026-09-21 12:00:00,餐饮美食,商户,午餐,支出,10,农业银
  await require('./test-web-financial-edits.cjs')({browser,baseUrl,db,entities,ok,errors});
  await require('./test-web-late-refunds.cjs')({browser,baseUrl,db,entities,ok,errors,upload,answerAccount});
  await require('./test-web-return-allocation.cjs')({browser,baseUrl,db,entities,ok,errors,upload});
+ await require('./test-web-clean-import.cjs')({browser,baseUrl,db,entities,ok,errors});
  await require('./test-web-account-memory.cjs')({browser,baseUrl,db,entities,ok,errors,upload});
  assert.deepEqual(errors,[]);
  fs.writeFileSync('/tmp/star-import-v09-validation.json',JSON.stringify({results,errors},null,2));

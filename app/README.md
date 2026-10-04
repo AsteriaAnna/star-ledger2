@@ -6,6 +6,8 @@ V2 正在 M5，服务基础不等于用户流程已完成。后续工作先遵�
 
 以下版本说明与底层记录为既有能力/历史资料，不能代替当前阶段验收。
 
+当前体验：[清理后的 M5 版本](https://asteriaanna.github.io/star-ledger2/preview/m5-20261004-clean/)，保留 Git 固定快照；进度见 [体验检查点](docs/m5-preview-progress.md)。旧队列与二次入账界面已撤下，同渠道账户问题一次回答，截图确认一次保存。部分补问和旧手工表单仍待后续任务验收。
+
 本版提供同一链接的电脑和手机界面，批量导入按渠道集中设置账户，亲情卡免逐笔确认，退款支持先入账后关联。当前规则与验证说明见 `docs/import-v0.9.md`；旧版发布记录保留在 docs 中。
 
 ```sh
@@ -17,7 +19,7 @@ npm run typecheck:web
 npm run test:web:imports
 ```
 
-浏览器验收：安装 Playwright 浏览器后运行 `npm run test:web`。也可通过 `CHROMIUM_EXECUTABLE` 指定测试浏览器路径。生成的 `web-dist` 可直接发布到 GitHub Pages 子目录。
+当前浏览器验收：安装 Playwright 浏览器后运行 `npm run test:web:imports`；`test:web` 为旧界面历史脚本，不作为当前验收入口。也可通过 `CHROMIUM_EXECUTABLE` 指定测试浏览器路径。生成的 `web-dist` 可直接发布到 GitHub Pages 子目录。
 
 ## 底层阶段记录（历史文档）
 
