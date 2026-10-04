@@ -1,0 +1,1 @@
+{"name":"star-ledger-register","version":"1.0.0","private":true,"main":"index.js","dependencies":{"@cloudbase/js-sdk":"3.10.1","@cloudbase/manager-node":"5.9.0"}}
