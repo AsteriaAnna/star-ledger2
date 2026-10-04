@@ -3,8 +3,30 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {CloudBaseSyncProvider} from '../packages/sync/cloudbase.ts';
 const {handleRequest,ledgerFor,prefixFor}=createRequire(import.meta.url)('../cloudbase/functions/star-ledger-sync/protocol.cjs');
-function fixture(){const rows=new Map<string,any>(),repo={get:async(id:string)=>rows.get(id)||null,list:async(prefix:string,cursor:string|undefined,limit:number)=>[...rows.values()].filter(r=>r._id>(cursor||prefix)&&r._id<prefix+'~').sort((a,b)=>a._id.localeCompare(b._id)).slice(0,limit),insertImmutable:async(row:any)=>{const old=rows.get(row._id);if(old&&old.content!==row.content)throw Error('REMOTE_COLLISION');rows.set(row._id,row);}};return {rows,repo};}
+function fixture(){const rows=new Map<string,any>(),repo={get:async(id:string)=>rows.get(id)||null,list:async(prefix:string,cursor:string|undefined,limit:number)=>[...rows.values()].filter(r=>r._id>(cursor||prefix)&&r._id<prefix+'~').sort((a,b)=>a._id.localeCompare(b._id)).slice(0,limit),insertImmutable:async(row:any)=>{const old=rows.get(row._id);if(old&&old.content!==row.content)throw Error('REMOTE_COLLISION');rows.set(row._id,row);},replaceKey:async(row:any,expected:string)=>{const old=rows.get(row._id);if(!old||old.owner!==row.owner||old.kind!=='KEY')throw Error('CLOUD_OWNER_MISMATCH');if(old.content===row.content)return;if(old.content!==expected)throw Error('CLOUD_KEY_CHANGED');rows.set(row._id,row);}};return {rows,repo};}
 const content=(ledger:string,seq=1)=>JSON.stringify({format:1,protocol:2,ledger,device:'device',seq,ciphertext:'encrypted',nonce:'nonce',tag:'tag'});
+test('password reset rewraps the same recovery key, rejects wrong files and preserves encrypted history',async()=>{
+ const {recoverCloudKey,parseCloudRecovery}=await import('../packages/application/cloud-recovery.ts');
+ const {createRecoveryKey,wrapRecoveryKey,unwrapRecoveryKey}=await import('../packages/platform/password-key.ts');
+ const {repo,rows}=fixture(),ledger=ledgerFor('A'),remote=new CloudBaseSyncProvider(data=>handleRequest(data,'A',repo),'A',ledger),key=createRecoveryKey();
+ const original=await wrapRecoveryKey(key,'old-password','A',ledger);await remote.putWrappedKey(original);
+ await remote.upload(`ledger-sync/${ledger}/device/0000000000000001.json`,content(ledger));const fileBefore=await remote.list();
+ assert.throws(()=>parseCloudRecovery(JSON.stringify({format:'star-ledger-cloud-recovery',version:1,uid:'B',ledger,recoveryKey:key}),'A',ledger),/CLOUD_OWNER_MISMATCH/);
+ await assert.rejects(recoverCloudKey(remote,'A',ledger,createRecoveryKey(),'new-password'),/CLOUD_KEY_UNLOCK_FAILED/);assert.equal(await remote.getWrappedKey(),original);
+ assert.equal(await recoverCloudKey(remote,'A',ledger,key,'new-password'),key);
+ const replaced=(await remote.getWrappedKey())!;assert.equal(await unwrapRecoveryKey(replaced,'new-password','A',ledger),key);await assert.rejects(unwrapRecoveryKey(replaced,'old-password','A',ledger),/CLOUD_KEY_UNLOCK_FAILED/);
+ assert.deepEqual(await remote.list(),fileBefore);assert.equal(await remote.download(fileBefore[0]),content(ledger));assert.equal(rows.size,2);
+ // A lost response can retry the same replacement; a stale different replacement cannot win.
+ await remote.replaceWrappedKey(original,replaced);await assert.rejects(remote.replaceWrappedKey(original,await wrapRecoveryKey(key,'other-password','A',ledger)),/CLOUD_KEY_CHANGED/);
+});
+test('legacy vault recovery verifies the supplied key against original encrypted data',async()=>{
+ const {recoverCloudKey}=await import('../packages/application/cloud-recovery.ts'),{createRecoveryKey,wrapRecoveryKey}=await import('../packages/platform/password-key.ts'),{webSessionCrypto}=await import('../packages/platform/web-crypto.ts');
+ const {repo}=fixture(),ledger=ledgerFor('A'),remote=new CloudBaseSyncProvider(data=>handleRequest(data,'A',repo),'A',ledger),key=createRecoveryKey();
+ const legacy=JSON.parse(await wrapRecoveryKey(key,'old','A',ledger));legacy.version=1;delete legacy.keyProof;await remote.putWrappedKey(JSON.stringify(legacy));
+ await assert.rejects(recoverCloudKey(remote,'A',ledger,key,'new'),/CLOUD_KEY_UNVERIFIABLE/);
+ const envelope=await(await webSessionCrypto(ledger,key)).seal({version:1,device:'device',seq:1,operations:[],checksum:'test'});await remote.upload(`ledger-sync/${ledger}/device/0000000000000001.json`,envelope);
+ await assert.rejects(recoverCloudKey(remote,'A',ledger,createRecoveryKey(),'new'),/CLOUD_KEY_UNLOCK_FAILED/);assert.equal(await recoverCloudKey(remote,'A',ledger,key,'new'),key);
+});
 test('cloud users cannot request another namespace or impersonate event.uid',async()=>{
  const {repo}=fixture(),a=ledgerFor('A'),b=ledgerFor('B');await assert.rejects(handleRequest({action:'HEALTH',ledger:a,uid:'A'},'B',repo),/CLOUD_OWNER_MISMATCH/);await assert.rejects(handleRequest({action:'HEALTH',ledger:a},null,repo),/CLOUD_AUTH_REQUIRED/);
  const own=await handleRequest({action:'HEALTH',ledger:b,uid:'A'},'B',repo);assert.deepEqual(own,{uid:'B',ledger:b});

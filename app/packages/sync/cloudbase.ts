@@ -17,4 +17,5 @@ export class CloudBaseSyncProvider implements EncryptedProvider {
  async upload(path:string,content:string){await this.request('PUT',{path,content});}
  async getWrappedKey():Promise<string|null>{const result=await this.request('GET_KEY');if(result?.wrappedKey!==null&&typeof result?.wrappedKey!=='string')throw Error('INVALID_CLOUD_RESPONSE');return result.wrappedKey;}
  async putWrappedKey(wrappedKey:string){await this.request('PUT_KEY',{wrappedKey});}
+ async replaceWrappedKey(expectedWrappedKey:string,wrappedKey:string){await this.request('REPLACE_KEY',{expectedWrappedKey,wrappedKey});}
 }

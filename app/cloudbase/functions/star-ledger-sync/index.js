@@ -12,6 +12,15 @@ const repo={
    if(old){if(old.owner!==row.owner||old.kind!==row.kind||old.content!==row.content)throw Error('REMOTE_COLLISION');return;}
    const {_id,...data}=row;await doc.set(data);
   });
+ },
+ async replaceKey(row,expected){
+  await db.runTransaction(async tx=>{
+   const doc=tx.collection(collection).doc(row._id),old=first(await doc.get());
+   if(!old||old.owner!==row.owner||old.kind!=='KEY')throw Error('CLOUD_OWNER_MISMATCH');
+   if(old.content===row.content)return;
+   if(old.content!==expected)throw Error('CLOUD_KEY_CHANGED');
+   const {_id,...data}=row;await doc.set(data);
+  });
  }
 };
 exports.main=async event=>{

@@ -37,6 +37,10 @@ async function handleRequest(event,uid,repo){
    if(typeof event.wrappedKey!=='string'||Buffer.byteLength(event.wrappedKey)>8192)error('INVALID_WRAPPED_KEY');
    await repo.insertImmutable({_id:prefix+'key',owner:uid,kind:'KEY',content:event.wrappedKey,digest:digest(event.wrappedKey)});return {saved:true};
   }
+  case 'REPLACE_KEY':{
+   if(typeof event.expectedWrappedKey!=='string'||typeof event.wrappedKey!=='string'||Buffer.byteLength(event.expectedWrappedKey)>8192||Buffer.byteLength(event.wrappedKey)>8192)error('INVALID_WRAPPED_KEY');
+   await repo.replaceKey({_id:prefix+'key',owner:uid,kind:'KEY',content:event.wrappedKey,digest:digest(event.wrappedKey)},event.expectedWrappedKey);return {saved:true};
+  }
   default:error('INVALID_CLOUD_ACTION');
  }
 }

@@ -2,6 +2,7 @@ import {sha256} from '@noble/hashes/sha256';
 import {bytesToHex} from '@noble/hashes/utils';
 import {CloudBaseSyncProvider} from '../../../packages/sync/cloudbase.ts';
 import {createRecoveryKey,wrapRecoveryKey,unwrapRecoveryKey} from '../../../packages/platform/password-key.ts';
+import {parseCloudRecovery,recoverCloudKey} from '../../../packages/application/cloud-recovery.ts';
 import {cloudbaseClient,cloudbaseSession,cloudbaseConfig,localCloudIdentity,type CloudIdentity} from './cloudbase.ts';
 import {selectLocalLedger,mutate,read,synchronizeEncrypted} from './store.ts';
 const ledgerFor=(uid:string)=>'cloud-'+bytesToHex(sha256(new TextEncoder().encode(uid))).slice(0,32);
@@ -11,7 +12,7 @@ async function provider(identity:CloudIdentity){
  return new CloudBaseSyncProvider(async data=>{
   if((await cloudbaseSession())?.uid!==identity.uid)throw Error('CLOUD_OWNER_MISMATCH');
   try{const response=await client.callFunction({name:'star-ledger-sync',data});if(!response.result||typeof response.result!=='object')throw Error('INVALID_CLOUD_RESPONSE');return response.result;}
-  catch(error){if(error instanceof Error&&['CLOUD_OWNER_MISMATCH','REMOTE_COLLISION'].includes(error.message))throw error;throw Error('CLOUDBASE_SYNC_UNAVAILABLE');}
+  catch(error){if(error instanceof Error&&['CLOUD_OWNER_MISMATCH','REMOTE_COLLISION','CLOUD_KEY_CHANGED'].includes(error.message))throw error;throw Error('CLOUDBASE_SYNC_UNAVAILABLE');}
  },identity.uid,ledgerFor(identity.uid));
 }
 /** Cloud holds only a password-wrapped key; passwords are never persisted by the ledger. */
@@ -24,6 +25,15 @@ export async function prepareCloudLedger(identity:CloudIdentity,password:string)
  }
  await selectLocalLedger(identity.uid);
  await mutate(store=>{if(store.state.cloud&&store.state.cloud.recoveryKey!==key)throw Error('CLOUD_KEY_UNLOCK_FAILED');store.state.cloud={uid:identity.uid,ledger:ledgerFor(identity.uid),recoveryKey:key};});
+}
+export async function recoverCloudLedger(identity:CloudIdentity,password:string,recoveryText?:string){
+ const state=await read(),local=state.cloud?.uid===identity.uid?state.cloud:undefined;
+ const ledger=ledgerFor(identity.uid),key=recoveryText?parseCloudRecovery(recoveryText,identity.uid,ledger).recoveryKey:local?.recoveryKey;
+ if(!key)throw Error('RECOVERY_FILE_REQUIRED');
+ if(local&&local.recoveryKey!==key)throw Error('CLOUD_KEY_UNLOCK_FAILED');
+ await recoverCloudKey(await provider(identity),identity.uid,ledger,key,password,local?.recoveryKey);
+ await selectLocalLedger(identity.uid);
+ await mutate(store=>{if(store.state.cloud&&store.state.cloud.recoveryKey!==key)throw Error('CLOUD_KEY_UNLOCK_FAILED');store.state.cloud={uid:identity.uid,ledger,recoveryKey:key};});
 }
 let running:Promise<void>|undefined;
 export function synchronizeCloud(progress:(message:string)=>void=()=>{}){
