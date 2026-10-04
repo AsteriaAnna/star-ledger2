@@ -157,3 +157,4 @@ html[data-layout="mobile"] .batch-tools{padding:12px}
 #detail-form [hidden]{display:none!important}
 #detail-financial{min-width:0;margin:18px 0;padding:16px;border:1px solid var(--line);border-radius:12px}
 #detail-edit-comparison{overflow-wrap:anywhere}
+.period-picker{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;max-width:100%}.period-picker>span{max-width:100%;overflow-wrap:anywhere}.analysis-stats small{display:block;overflow-wrap:anywhere}.analysis-stats>div{min-width:0}html[data-layout="mobile"] .period-picker{flex:1;min-width:0}html[data-layout="mobile"] .period-picker .quiet{padding:8px}
