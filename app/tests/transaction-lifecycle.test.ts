@@ -26,7 +26,7 @@ test('batch deletion and restoration retain edits and scope, including original 
  const marker=h.get('p').fields.user_edits;
  h.execute(h.request('DELETE',['p','r','p']));h.execute(h.request('RESTORE',['p','r']));
  assert.equal(h.get('p').fields.display_amount,2500);assert.equal(h.get('p').fields.note,'已改');assert.equal(h.get('p').fields.user_edits,marker);
- assert.equal(h.get('r').fields.deleted_at,null);assert.equal(h.store.conflicts.length,0);assert.deepEqual(detachedRefundReviews(h.snap()).map(r=>r.id),['r']);
+ assert.equal(h.get('r').fields.deleted_at,null);assert.equal(h.store.conflicts.length,0);assert.deepEqual(detachedRefundReviews(h.snap()),[]);assert.ok(h.store.entities.some(e=>e.type==='transaction_links'&&!e.fields.deleted_at&&e.fields.from_transaction_id==='r'));
 });
 test('changed relation facts after preview reject the whole stale selection',()=>{
  const h=fixture(),request=h.request('DELETE',['p']);h.service.execute(s=>planDetailEdit({transactionId:'r',expectedSnapshot:transactionEditContext(s,'r').expectedSnapshot,changedFields:{note:'另一窗口修改'}},s));

@@ -1,3 +1,4 @@
+import {relationDecision} from './refund-relations.ts';
 import {financialEditFields,financialFieldNames,planFinancialEdit,type FinancialFields} from './transaction-financial-edit.ts';
 import type {Command,LedgerSnapshot} from '../accounting/index.ts';
 import {correctionSnapshot,pendingPostings} from '../accounting/business.ts';
@@ -51,5 +52,5 @@ export function detachedRefundReviews(snapshot:LedgerSnapshot){
  const links=snapshot.entities.filter(e=>e.type==='transaction_links');
  const detached=new Set(links.filter(e=>e.fields.deleted_at).map(e=>e.fields.from_transaction_id));
  const active=new Set(links.filter(e=>!e.fields.deleted_at).map(e=>e.fields.from_transaction_id));
- return snapshot.entities.filter(e=>e.type==='transactions'&&!e.fields.deleted_at&&!e.fields.purged_at&&e.fields.status==='SUCCESS'&&['REFUND','RETURN'].includes(String(e.fields.event_type))&&detached.has(e.id)&&!active.has(e.id)).map(e=>({id:e.id,name:String(e.fields.display_name)}));
+ return snapshot.entities.filter(e=>e.type==='transactions'&&!e.fields.deleted_at&&!e.fields.purged_at&&e.fields.status==='SUCCESS'&&['REFUND','RETURN'].includes(String(e.fields.event_type))&&detached.has(e.id)&&!active.has(e.id)&&relationDecision(snapshot,e.id)?.originalId!==null).map(e=>({id:e.id,name:String(e.fields.display_name)}));
 }

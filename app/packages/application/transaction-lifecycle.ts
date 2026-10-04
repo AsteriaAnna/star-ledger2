@@ -1,3 +1,4 @@
+import {planRestoredRefundRelations} from './refund-relations.ts';
 import type {Command,LedgerSnapshot} from '../accounting/index.ts';
 import {applyCommands,correctionSnapshot,interpret} from '../accounting/business.ts';
 import type {BusinessCommand} from '../domain/accounting.ts';
@@ -14,7 +15,7 @@ export function lifecycleContext(snapshot:LedgerSnapshot,action:LifecycleAction,
  });
  const related=new Set(transactionIds);
  for(const e of snapshot.entities.filter(e=>e.type==='transaction_links'))if(related.has(String(e.fields.to_transaction_id))||transactionIds.includes(String(e.fields.from_transaction_id))){related.add(String(e.fields.from_transaction_id));related.add(String(e.fields.to_transaction_id));}
- const expectedSnapshot=JSON.stringify([action,transactionIds,[...related].sort().map(id=>correctionSnapshot(snapshot.entities,id))]);
+ const expectedSnapshot=JSON.stringify([action,transactionIds,[...related].sort().map(id=>correctionSnapshot(snapshot.entities,id)),snapshot.entities.filter(e=>e.type==='import_rules'&&[...related].some(id=>e.fields.rule_key===`refund-relation:${id}`)).sort((a,b)=>a.id.localeCompare(b.id))]);
  const affectedRefundIds=snapshot.entities.filter(e=>e.type==='transaction_links'&&!e.fields.deleted_at&&(transactionIds.includes(String(e.fields.from_transaction_id))||transactionIds.includes(String(e.fields.to_transaction_id)))).map(e=>String(e.fields.from_transaction_id));
  return {transactionIds,expectedSnapshot,targets,affectedRefundIds:[...new Set(affectedRefundIds)]};
 }
@@ -30,6 +31,7 @@ export function planTransactionLifecycle(request:LifecycleRequest,snapshot:Ledge
   for(const id of context.transactionIds){const tx=working.entities.find(e=>e.type==='transactions'&&e.id===id)!;
    if(tx.fields.status==='SUCCESS'&&['REFUND','RETURN'].includes(String(tx.fields.event_type)))advance({kind:'UNLINK_RETURN',transactionId:id,detachedAt:request.now});
   }
+  commands.push(...planRestoredRefundRelations(snapshot,working,context.transactionIds));
  }else{
   for(const id of context.affectedRefundIds){const tx=working.entities.find(e=>e.type==='transactions'&&e.id===id);
    if(tx&&!tx.fields.deleted_at&&tx.fields.status==='SUCCESS')advance({kind:'UNLINK_RETURN',transactionId:id,detachedAt:request.now});
