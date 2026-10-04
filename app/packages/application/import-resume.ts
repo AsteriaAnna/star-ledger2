@@ -11,7 +11,8 @@ import {sourceReviewToken} from './import-source-attention.ts';
 /** Rebuilds only from captured interpretations, never from a newer parser. */
 export async function planResumeImport(sessionId:string,workspace:ImportWorkspaceSnapshot,ledger:LedgerSnapshot,now:string){
  const expectedToken=sourceReviewToken(workspace,ledger),session=workspace.sessions[sessionId];
- if(!session||!['PROCESSING','FAILED'].includes(session.state))throw Error('IMPORT_SESSION_NOT_RESUMABLE');
+ const blocking=(workspace.attention[sessionId]??[]).filter(a=>a.blocking),allocationOnly=session?.state==='NEEDS_ATTENTION'&&blocking.length>0&&blocking.every(a=>a.kind==='CONSUMPTION_ALLOCATION');
+ if(!session||!['PROCESSING','FAILED'].includes(session.state)&&!allocationOnly)throw Error('IMPORT_SESSION_NOT_RESUMABLE');
  const records=workspace.records[sessionId]??[],interpretations=workspace.interpretations?.[sessionId]??[];
  if(!records.length||interpretations.length!==records.length||records.some(r=>!interpretations.some(i=>i.externalRecordId===r.id)))throw Error('IMPORT_INTERPRETATION_UNAVAILABLE');
  const memory=new InMemoryImportWorkspace(workspace);

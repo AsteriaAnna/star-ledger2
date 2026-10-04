@@ -46,7 +46,7 @@ export function refreshRefundAttention(workspace:ImportWorkspaceSnapshot,ledger:
  for(const [sessionId,items] of Object.entries(next.attention)){
   let changed=false;
   next.attention[sessionId]=items.flatMap(item=>{
-   if(item.kind!=='REFUND_RELATION')return [item];
+   if(!['REFUND_RELATION','CONSUMPTION_ALLOCATION'].includes(item.kind))return [item];
    const outcome=next.outcomes[sessionId]?.find(e=>e.externalRecordId===item.externalRecordId);
    if(outcome?.state!=='COMMITTED'||!outcome.transactionId)return [item];
    const tx=ledger.entities.find(e=>e.type==='transactions'&&e.id===outcome.transactionId&&!e.fields.deleted_at&&!e.fields.purged_at);

@@ -131,6 +131,19 @@ test('resume rejects old sessions without interpretations without mutating captu
  const before=structuredClone(saved);await assert.rejects(planResumeImport('first',saved,h.snapshot(),at),/IMPORT_INTERPRETATION_UNAVAILABLE/);assert.deepEqual(saved,before);
 });
 
+test('legacy allocation-only blocked import resumes known arrival from captured facts and keeps a nonblocking question',async()=>{
+ const h=fixture();h.business.execute({kind:'EXTERNAL_TRANSFER',id:'original',name:'转出含消费',amount:10000,from:null,consumptionAmount:3000,occurredAt:'2026-09-19T04:00:00Z',source:{id:'original-source',sourceType:'EXCEL',platform:'微信',rawPayload:JSON.stringify({profile:'本人',order:'paid',original:'{}'})}});
+ const workspace=new InMemoryImportWorkspace(),service=new ImportStatementService(workspace),columns=header.replace('交易单号\n','交易单号,原交易单号\n');
+ await resolveLegacyImportBatch({drafts:parseRows(csv(columns+'2026-09-20 12:00:00,转账-退款,朋友,退回,收入,20,/,退款成功,return-order,paid\n')),sessionId:'legacy',ledger:h.snapshot(),now:at,service});
+ const saved=workspace.snapshot(),item=saved.attention.legacy.find(a=>a.kind==='CONSUMPTION_ALLOCATION')!;assert.ok(item);item.blocking=true;saved.sessions.legacy.state='NEEDS_ATTENTION';saved.sessions.legacy.blockingAttentionCount=1;saved.sessions.legacy.nonBlockingAttentionCount=0;
+ saved.outcomes.legacy=[{sessionId:'legacy',externalRecordId:item.externalRecordId,state:'BLOCKED',transactionId:null,updatedAt:at}];
+ const before=structuredClone(saved),plan=await planResumeImport('legacy',saved,h.snapshot(),at);assert.deepEqual(saved,before);h.business.executeBatch(plan.execution.commands);
+ assert.equal(plan.session.state,'COMPLETED');assert.equal(plan.session.committedCount,1);assert.equal(plan.session.blockingAttentionCount,0);assert.equal(plan.workspace.attention.legacy.find(a=>a.kind==='CONSUMPTION_ALLOCATION')?.blocking,false);
+ const outcome=plan.workspace.outcomes.legacy[0];assert.equal(outcome.state,'COMMITTED');assert.equal(h.store.entities.find(e=>e.type==='consumption_effects'&&e.fields.transaction_id===outcome.transactionId)?.fields.amount,0);assert.equal(h.store.entities.find(e=>e.type==='balance_movements'&&e.fields.transaction_id===outcome.transactionId)?.fields.amount,2000);
+ assert.deepEqual(plan.workspace.records.legacy,saved.records.legacy);assert.deepEqual(plan.workspace.interpretations!.legacy,saved.interpretations!.legacy);await assert.rejects(planResumeImport('legacy',plan.workspace,h.snapshot(),at),/IMPORT_SESSION_NOT_RESUMABLE/);
+ const another=structuredClone(saved);another.attention.legacy.push({...item,id:'status',kind:'STATUS'});await assert.rejects(planResumeImport('legacy',another,h.snapshot(),at),/IMPORT_SESSION_NOT_RESUMABLE/);
+});
+
 test('an adopted refund source can add an explicit original relation without duplicating the refund',async()=>{
  const h=fixture();await h.upload('purchase',row(10));const original=h.store.entities.find(e=>e.type==='transactions')!;
  const columns=header.replace('交易单号\n','交易单号,原交易单号\n');

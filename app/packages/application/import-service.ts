@@ -153,7 +153,7 @@ export class ImportStatementService {
     const previousReturned=previous.reduce((sum,value)=>sum+Number(value.fields.display_amount),0);
     const previousReduction=-previous.reduce((sum,value)=>sum+Number(working.entities.find(e=>e.type==='consumption_effects'&&e.fields.transaction_id===value.id)?.fields.amount??0),0);
     const allocation=resolveReturnAllocation({originalAmount:Number(original.fields.display_amount),originalConsumption:Number(originalEffect?.fields.amount??0),previousReturned,previousReduction,amount:interpretation.amountFen});
-    if(allocation.state==='NEEDS_ALLOCATION')items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'CONSUMPTION_ALLOCATION',question:allocation.reason,blocking:true,candidates:[],createdAt:input.now}));
+    if(allocation.state==='NEEDS_ALLOCATION')items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'CONSUMPTION_ALLOCATION',question:allocation.reason,blocking:false,candidates:[{id:original.id,label:String(original.fields.display_name)}],createdAt:input.now}));
    }
 
    if(relation?.state==='SUGGESTED'){

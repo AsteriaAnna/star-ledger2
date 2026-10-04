@@ -50,7 +50,7 @@ export function buildImportedLedgerIntent(input:LedgerIntentBuildInput):LedgerIn
  const sponsored=relationSponsored??sourceSponsored;
  const relationAccount=resolved.relation?.state==='RESOLVED'?resolved.relation.destinationAccountId:null;
  const primary=account??relationAccount??null;
- const originalId=resolved.relation?.state==='RESOLVED'?resolved.relation.originalId:null;
+ const originalId=resolved.relation?.state==='RESOLVED'&&!resolved.attention.some(a=>a.kind==='CONSUMPTION_ALLOCATION')?resolved.relation.originalId:null;
 
  switch(interpretation.eventKind){
   case 'PURCHASE':return {...base,kind:'PURCHASE',payer:sponsored?null:primary,categoryId:interpretation.categorySuggestion??undefined,funding:sponsored?'EXTERNAL_SPONSOR':'OWN'};

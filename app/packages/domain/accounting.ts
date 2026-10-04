@@ -33,7 +33,7 @@ export type BindAccount = ({kind:'BIND_ACCOUNT'}|{kind:'RESOLVE_ACCOUNT_BINDING'
 export type BindPendingAccount={kind:'BIND_PENDING_ACCOUNT';transactionId:string;movementId:string;accountId:string;expectedSnapshot:string};
 export type ResolveSettlement = {kind:'RESOLVE_SETTLEMENT';transactionId:string;status:'SUCCESS'|'FAILED';settlement?:FinancialEvent;expectedOperationIds:string[]};
 export type CorrectAmount = {kind:'CORRECT_AMOUNT';transactionId:string;amount:number;expectedAmount:number;reason:string;correctedAt:string;sourceId:string};
-export type LinkReturn = {kind:'LINK_RETURN';transactionId:string;originalId:string};
+export type LinkReturn = {kind:'LINK_RETURN';transactionId:string;originalId:string;consumptionReduction?:number};
 export type UnlinkReturn = {kind:'UNLINK_RETURN';transactionId:string;detachedAt:string};
 export type CorrectTransaction={kind:'CORRECT_TRANSACTION';transactionId:string;replacement:LedgerIntent;expectedSnapshot:string;correctedAt:string};
 /** @deprecated V1 compatibility only. New application code uses CORRECT_TRANSACTION. */

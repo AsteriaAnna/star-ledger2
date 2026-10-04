@@ -71,11 +71,11 @@ test('repayment preserves the known event while unresolved liability endpoint be
  assert.equal(result.records[0].ledgerState,'READY_FOR_LEDGER');assert.equal(result.records[0].attention.find(x=>x.kind==='TRANSFER_ENDPOINTS')?.blocking,false);
 });
 
-test('strong refund relation still blocks when partial-consumption allocation is genuinely ambiguous',async()=>{
+test('strong refund relation records known arrival while consumption allocation remains a nonblocking question',async()=>{
  const r=record('refund-partial',{sourceSystem:'WECHAT',platformRaw:'微信',facts:{...record('x').facts,channelRaw:'/',transactionTypeRaw:'商户退款',directionRaw:'收入',amountFen:200,orderId:'refund-partial',refundId:'refund-partial',originalOrderId:'paid'}});
  const entities=[tx('t1','PURCHASE',1000),sourceEvidence('src','t1','paid'),{type:'consumption_effects',id:'t1:effect',fields:{transaction_id:'t1',amount:600,category_id:'购物',subcategory_id:null,effective_at:'2026-09-01T00:00:00Z',created_at:'2026-09-01T00:00:00Z'}} as Entity];
  const result=await pipeline(r,interpretation(r.id,{eventKind:'REFUND',amountFen:200,channelRaw:'/'}),entities);
- assert.equal(result.records[0].relation?.state,'RESOLVED');assert.equal(result.records[0].ledgerState,'NEEDS_ATTENTION');assert.equal(result.records[0].attention.find(x=>x.kind==='CONSUMPTION_ALLOCATION')?.blocking,true);
+ assert.equal(result.records[0].relation?.state,'RESOLVED');assert.equal(result.records[0].ledgerState,'READY_FOR_LEDGER');assert.equal(result.records[0].attention.find(x=>x.kind==='CONSUMPTION_ALLOCATION')?.blocking,false);
 });
 
 test('revival resolves funding instead of rebuilding a known payer as null',async()=>{

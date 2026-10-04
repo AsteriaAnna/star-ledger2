@@ -1,3 +1,4 @@
+import {retainedReturnReduction} from '../accounting/return-context.ts';
 import type {BusinessCommand,LedgerIntent} from '../domain/accounting.ts';
 import type {LedgerSnapshot} from '../accounting/index.ts';
 import {applyCommands,correctionSnapshot,interpret} from '../accounting/business.ts';
@@ -16,7 +17,7 @@ export type CorrectionPlan={
  relationReviewIds:string[];
 };
 
-const relationErrors=new Set(['ORIGINAL_UNAVAILABLE','INVALID_RETURN_KIND','RETURN_BEFORE_ORIGINAL','RETURN_EXCEEDS_ORIGINAL','CONSUMPTION_ALLOCATION_REQUIRED','SPONSORED_REFUND_HAS_OWN_ACCOUNT']);
+const relationErrors=new Set(['ORIGINAL_UNAVAILABLE','INVALID_RETURN_KIND','RETURN_BEFORE_ORIGINAL','RETURN_EXCEEDS_ORIGINAL','CONSUMPTION_ALLOCATION_REQUIRED','SPONSORED_REFUND_HAS_OWN_ACCOUNT','REFUND_CONSUMPTION_EXCEEDED','REFUND_NONCONSUMPTION_EXCEEDED']);
 const expectedRelationError=(error:unknown)=>error instanceof Error&&relationErrors.has(error.message);
 
 const activeLinks=(snapshot:LedgerSnapshot)=>snapshot.entities.filter(e=>e.type==='transaction_links'&&!e.fields.deleted_at);
@@ -38,7 +39,7 @@ export function planTransactionCorrection(request:CorrectionRequest,snapshot:Led
  if(request.replacement.id!==request.transactionId)throw Error('INVALID_CORRECTION');
 
  const links=activeLinks(snapshot).filter(link=>link.fields.from_transaction_id===request.transactionId||link.fields.to_transaction_id===request.transactionId);
- const relationRows=links.map(link=>({refundId:String(link.fields.from_transaction_id),originalId:String(link.fields.to_transaction_id)}));
+ const relationRows=links.map(link=>({refundId:String(link.fields.from_transaction_id),originalId:String(link.fields.to_transaction_id),consumptionReduction:retainedReturnReduction(snapshot.entities,String(link.fields.from_transaction_id),String(link.fields.to_transaction_id))}));
  const detachIds=[...new Set(relationRows.map(row=>row.refundId))];
  const commands:BusinessCommand[]=[];
  let working=snapshot;
@@ -69,7 +70,7 @@ export function planTransactionCorrection(request:CorrectionRequest,snapshot:Led
    return String(ta?.fields.occurred_at||'').localeCompare(String(tb?.fields.occurred_at||''))||a.refundId.localeCompare(b.refundId);
   });
   for(const row of ordered){
-   const command:BusinessCommand={kind:'LINK_RETURN',transactionId:row.refundId,originalId:request.transactionId};
+   const command:BusinessCommand={kind:'LINK_RETURN',transactionId:row.refundId,originalId:request.transactionId,consumptionReduction:row.consumptionReduction};
    try{trial=advance(trial,command).snapshot;trialCommands.push(command);}catch(error){if(!expectedRelationError(error))throw error;valid=false;break;}
   }
   if(valid){working=trial;commands.push(...trialCommands);relinked.push(...ordered.map(row=>row.refundId));}
@@ -79,7 +80,7 @@ export function planTransactionCorrection(request:CorrectionRequest,snapshot:Led
  for(const row of outgoing){
   const correctedTarget=tx(working,request.transactionId);
   if(!correctedTarget||!['REFUND','RETURN'].includes(String(correctedTarget.fields.event_type))){review.push(row.refundId);continue;}
-  const command:BusinessCommand={kind:'LINK_RETURN',transactionId:request.transactionId,originalId:row.originalId};
+  const command:BusinessCommand={kind:'LINK_RETURN',transactionId:request.transactionId,originalId:row.originalId,consumptionReduction:row.consumptionReduction};
   try{working=advance(working,command).snapshot;commands.push(command);relinked.push(row.refundId);}catch(error){if(!expectedRelationError(error))throw error;review.push(row.refundId);}
  }
 
