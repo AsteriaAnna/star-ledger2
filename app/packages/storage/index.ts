@@ -12,7 +12,7 @@ export class SqliteStore implements SyncStore {
   const exists=this.db.prepare("SELECT name FROM sqlite_master WHERE name='schema_version'").get();
   if(!exists) this.atomic(()=>this.db.exec(readFileSync(new URL('./migrations/001.sql',import.meta.url),'utf8')));
   const version=this.db.prepare('SELECT MAX(version) v FROM schema_version').get()?.v;
-  if(![1,2,3,4,5,6,7].includes(Number(version)))throw Error('UNSUPPORTED_SCHEMA');
+  if(![1,2,3,4,5,6,7,8].includes(Number(version)))throw Error('UNSUPPORTED_SCHEMA');
   const old=this.db.prepare('SELECT device_id FROM sync_devices').get();
   if(old && old.device_id!==device) throw Error('DEVICE_ID_MISMATCH');
   if(version===1)this.atomic(()=>this.db.exec(readFileSync(new URL('./migrations/002.sql',import.meta.url),'utf8')));
@@ -21,6 +21,7 @@ export class SqliteStore implements SyncStore {
   if(Number(version)<5)this.atomic(()=>this.db.exec(readFileSync(new URL('./migrations/005.sql',import.meta.url),'utf8')));
   if(Number(version)<6)this.atomic(()=>this.db.exec(readFileSync(new URL('./migrations/006.sql',import.meta.url),'utf8')));
   if(Number(version)<7)this.atomic(()=>this.db.exec(readFileSync(new URL('./migrations/007.sql',import.meta.url),'utf8')));
+  if(Number(version)<8)this.atomic(()=>this.db.exec(readFileSync(new URL('./migrations/008.sql',import.meta.url),'utf8')));
   this.db.prepare('INSERT OR IGNORE INTO sync_devices VALUES(?)').run(device);
   }catch(error){this.db.close();throw error;}
  }

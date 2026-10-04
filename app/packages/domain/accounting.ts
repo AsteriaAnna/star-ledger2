@@ -1,7 +1,7 @@
 /** All monetary values are CNY fen. A null account means unresolved, not external. */
 export type AccountRef = string | null;
 export type Status = 'SUCCESS' | 'PENDING' | 'FAILED';
-export type SourceEvidence = { id:string; sourceType:'MANUAL'|'SCREENSHOT'|'EXCEL'; platform:string; rawPayload:string };
+export type SourceEvidence = { id:string; sourceType:'MANUAL'|'SCREENSHOT'|'EXCEL'; platform:string; rawPayload:string; capturedAt?:string };
 export type EventBase = {
  id:string; occurredAt:string; name:string; note?:string;
  status?:Status; source?:SourceEvidence;
@@ -22,12 +22,15 @@ export type Refund = EventBase & {kind:'REFUND'|'RETURN';amount:number;originalI
  funding?:'OWN'|'EXTERNAL_SPONSOR';categoryId?:string;consumptionReduction?:number};
 export type Meaning = {kind:'SET_CONSUMPTION';transactionId:string;amount:number;categoryId:string|null};
 export type DeleteTransaction = {kind:'DELETE_TRANSACTION';transactionId:string;deletedAt:string};
+export type RestoreTransaction = {kind:'RESTORE_TRANSACTION';transactionId:string};
+export type AttachSourceEvidence={kind:'ATTACH_SOURCE_EVIDENCE';transactionId:string;source:SourceEvidence};
 /** A fully resolved accounting intent ready for domain validation and posting. */
 export type LedgerIntent = Purchase|Income|InternalTransfer|Withdrawal|ExternalPayment|Repayment|Refund;
 /** @deprecated Use LedgerIntent. Kept during the M4 parallel migration. */
 export type FinancialEvent = LedgerIntent;
 export type SetStatus = {kind:'SET_STATUS';transactionId:string;status:'SUCCESS'|'FAILED';settlement?:FinancialEvent};
 export type BindAccount = ({kind:'BIND_ACCOUNT'}|{kind:'RESOLVE_ACCOUNT_BINDING'}) & {movementId:string;accountId:string};
+export type BindPendingAccount={kind:'BIND_PENDING_ACCOUNT';transactionId:string;movementId:string;accountId:string;expectedSnapshot:string};
 export type ResolveSettlement = {kind:'RESOLVE_SETTLEMENT';transactionId:string;status:'SUCCESS'|'FAILED';settlement?:FinancialEvent;expectedOperationIds:string[]};
 export type CorrectAmount = {kind:'CORRECT_AMOUNT';transactionId:string;amount:number;expectedAmount:number;reason:string;correctedAt:string;sourceId:string};
 export type LinkReturn = {kind:'LINK_RETURN';transactionId:string;originalId:string};
@@ -35,4 +38,4 @@ export type UnlinkReturn = {kind:'UNLINK_RETURN';transactionId:string;detachedAt
 export type CorrectTransaction={kind:'CORRECT_TRANSACTION';transactionId:string;replacement:LedgerIntent;expectedSnapshot:string;correctedAt:string};
 /** @deprecated V1 compatibility only. New application code uses CORRECT_TRANSACTION. */
 export type CorrectImportedEvent={kind:'CORRECT_IMPORTED_EVENT';transactionId:string;replacement:FinancialEvent;expectedSnapshot:string;sourceId:string;correctedAt:string};
-export type BusinessCommand = CorrectTransaction|CorrectImportedEvent|LinkReturn|UnlinkReturn| CorrectAmount|SetBalanceAnchor| ResolveSettlement| SetStatus|BindAccount| DeleteTransaction| CreateAccount|Purchase|Income|InternalTransfer|Withdrawal|ExternalPayment|Repayment|Refund|Meaning;
+export type BusinessCommand = BindPendingAccount|CorrectTransaction|CorrectImportedEvent|LinkReturn|UnlinkReturn| CorrectAmount|SetBalanceAnchor| ResolveSettlement| SetStatus|BindAccount| DeleteTransaction|RestoreTransaction|AttachSourceEvidence| CreateAccount|Purchase|Income|InternalTransfer|Withdrawal|ExternalPayment|Repayment|Refund|Meaning;

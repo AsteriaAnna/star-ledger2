@@ -64,7 +64,7 @@ export type EventInterpretation={
 
 export type AttentionKind=
  'ACCOUNT'|'EVENT_MEANING'|'STATUS'|'DATE'|'AMOUNT'|'TEMPLATE'|'REFUND_RELATION'|
- 'TRANSFER_ENDPOINTS'|'SPLIT_PAYMENT'|'CONSUMPTION_ALLOCATION'|'POSSIBLE_DUPLICATE';
+ 'TRANSFER_ENDPOINTS'|'SPLIT_PAYMENT'|'CONSUMPTION_ALLOCATION'|'POSSIBLE_DUPLICATE'|'SOURCE_UPDATE';
 
 export type AttentionCandidate={
  id:string;
@@ -84,6 +84,9 @@ export type AttentionItem={
 };
 
 export type ImportSessionState='PROCESSING'|'NEEDS_ATTENTION'|'COMPLETED'|'FAILED'|'ROLLED_BACK';
+
+export type ImportRecordOutcomeState='COMMITTED'|'SKIPPED_DUPLICATE'|'NO_EFFECT'|'BLOCKED';
+export type ImportRecordOutcome={sessionId:string;externalRecordId:string;state:ImportRecordOutcomeState;transactionId:string|null;updatedAt:string};
 
 export type ImportSession={
  id:string;

@@ -77,8 +77,9 @@ export function resolveRefundRelation(input:RefundResolutionInput,entities:Entit
  }
  const source= sources(entities,input.platform,input.profile);
 
- if(input.originalOrderId){
-  const ids=new Set(source.filter(s=>s.order===input.originalOrderId).map(s=>s.transactionId));
+ const originalOrderId=input.originalOrderId??(input.platform==='支付宝'?input.orderId?.match(/^(.+?)(?:\*REFUND_\d+|_\d+)$/)?.[1]:null);
+ if(originalOrderId){
+  const ids=new Set(source.filter(s=>s.order===originalOrderId).map(s=>s.transactionId));
   const matches=originals.filter(t=>ids.has(t.id));
   if(matches.length===1)return resultFor(input,entities,matches[0],'ORIGINAL_ORDER','按原订单号唯一关联');
   if(matches.length>1)return {...none,state:'SUGGESTED',candidates:matches.map(t=>t.id),reason:'原订单号对应多笔候选，需要确认',evidence:'ORIGINAL_ORDER'};

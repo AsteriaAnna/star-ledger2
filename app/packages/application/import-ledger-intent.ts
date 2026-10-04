@@ -1,3 +1,5 @@
+import {sha256} from '@noble/hashes/sha256';
+import {bytesToHex} from '@noble/hashes/utils';
 import type {LedgerIntent,SourceEvidence} from '../domain/accounting.ts';
 import type {ExternalRecord} from '../importing/types.ts';
 import type {ResolvedImportRecord} from './import-service.ts';
@@ -9,7 +11,9 @@ export type LedgerIntentBuildInput={
 
 export const sourceIdentityNamespace=(source:ExternalRecord)=>[source.sourceSystem,source.platformRaw,source.profile,source.sourceIdentity].map(value=>encodeURIComponent(value)).join(':');
 export const importedTransactionId=(source:ExternalRecord)=>'import-v2:'+sourceIdentityNamespace(source);
-export const importedSourceRecordId=(source:ExternalRecord)=>'source-v2:'+sourceIdentityNamespace(source);
+export const importedSourceRecordId=(source:ExternalRecord)=>'source-v2:'+bytesToHex(sha256(new TextEncoder().encode(sourceIdentityNamespace(source)+'\n'+source.rawPayload)));
+
+export const sourceDecisionId=(source:ExternalRecord)=>'v2-source-decision:'+importedSourceRecordId(source).slice('source-v2:'.length);
 
 export function importSourcePayload(source:ExternalRecord){
  return JSON.stringify({
@@ -27,6 +31,8 @@ export function importSourcePayload(source:ExternalRecord){
  });
 }
 
+export function importedSourceEvidence(source:ExternalRecord):SourceEvidence{return {id:importedSourceRecordId(source),sourceType:source.sourceType,platform:source.platformRaw,rawPayload:importSourcePayload(source),capturedAt:source.capturedAt};}
+
 export function buildImportedLedgerIntent(input:LedgerIntentBuildInput):LedgerIntent{
  const {resolved,source}=input,interpretation=resolved.interpretation;
  if(resolved.ledgerState!=='READY_FOR_LEDGER'||resolved.disposition!=='INTERPRETED')throw Error('IMPORT_NOT_READY_FOR_LEDGER');
@@ -36,7 +42,7 @@ export function buildImportedLedgerIntent(input:LedgerIntentBuildInput):LedgerIn
  if(interpretation.eventKind==='UNKNOWN')throw Error('IMPORT_EVENT_NOT_POSTABLE');
 
  const id=importedTransactionId(source);
- const sourceEvidence:SourceEvidence={id:importedSourceRecordId(source),sourceType:source.sourceType,platform:source.platformRaw,rawPayload:importSourcePayload(source)};
+ const sourceEvidence=importedSourceEvidence(source);
  const base={id,occurredAt:interpretation.occurredAt,name:interpretation.displayName.trim()||source.facts.counterpartyRaw||source.facts.productRaw||source.facts.transactionTypeRaw||'账单记录',amount:interpretation.amountFen,status:interpretation.status,note:source.facts.noteRaw||source.facts.productRaw||'',source:sourceEvidence};
  const account=resolved.account?.state==='RESOLVED'?resolved.account.accountId:null;
  const sourceSponsored=/亲情卡|亲属卡/.test(source.facts.channelRaw);
@@ -47,7 +53,7 @@ export function buildImportedLedgerIntent(input:LedgerIntentBuildInput):LedgerIn
  const originalId=resolved.relation?.state==='RESOLVED'?resolved.relation.originalId:null;
 
  switch(interpretation.eventKind){
-  case 'PURCHASE':return {...base,kind:'PURCHASE',payer:sponsored?null:primary,funding:sponsored?'EXTERNAL_SPONSOR':'OWN'};
+  case 'PURCHASE':return {...base,kind:'PURCHASE',payer:sponsored?null:primary,categoryId:interpretation.categorySuggestion??undefined,funding:sponsored?'EXTERNAL_SPONSOR':'OWN'};
   case 'INCOME':case 'TRANSFER_IN':return {...base,kind:interpretation.eventKind,destination:primary};
   case 'INTERNAL_TRANSFER':return {...base,kind:'INTERNAL_TRANSFER',from:primary,to:null};
   case 'WITHDRAWAL':{

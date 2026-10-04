@@ -22,6 +22,13 @@ export function correctionSnapshot(entities:Entity[],id:string){
  return JSON.stringify(entities.filter(e=>e.type==='transactions'&&e.id===id||e.fields.transaction_id===id||e.fields.from_transaction_id===id||e.fields.to_transaction_id===id).sort((a,b)=>(a.type+':'+a.id).localeCompare(b.type+':'+b.id)));
 }
 
+export function pendingPostings(transaction:Entity):Entity[]{
+ if(transaction.fields.status!=='PENDING')throw Error('TRANSACTION_NOT_PENDING');
+ let values:unknown;try{values=JSON.parse(String(transaction.fields.posting_plan));}catch{throw Error('INVALID_POSTING_PLAN');}
+ if(!Array.isArray(values)||values.some(e=>!e||typeof e.id!=='string'||!['balance_movements','consumption_effects','transaction_links'].includes(e.type)||!e.fields||(e.type==='transaction_links'?e.fields.from_transaction_id:e.fields.transaction_id)!==transaction.id))throw Error('INVALID_POSTING_PLAN');
+ return values as Entity[];
+}
+
 export class BusinessAccountingService {
  private core:AccountingService;
  constructor(store:Store,device:string){this.core=new AccountingService(store,device);}
@@ -49,15 +56,30 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
   assertClear('accounts',id);return a;
  };
  const commands:Command[]=[];
+ if(c.kind==='BIND_PENDING_ACCOUNT'){
+  const tx=get('transactions',c.transactionId);
+  if(!tx||tx.fields.deleted_at||tx.fields.purged_at||tx.fields.status!=='PENDING')throw Error('TRANSACTION_UNAVAILABLE');
+  assertClear('transactions',tx.id);
+  if(correctionSnapshot(entities,tx.id)!==c.expectedSnapshot)throw Error('STALE_TRANSACTION');
+  const planned=pendingPostings(tx);
+  if(!planned.some(e=>e.type==='balance_movements'&&e.id===c.movementId))throw Error('MOVEMENT_UNAVAILABLE');
+  const virtual={...snapshot,entities:[...entities.filter(e=>e.id!==tx.id||e.type!=='transactions'),{...tx,fields:{...tx.fields,status:'SUCCESS'}},...planned]};
+  // Reuse the same account/type/sign constraints, but persist only the future plan.
+  const binding=interpret({kind:'BIND_ACCOUNT',movementId:c.movementId,accountId:c.accountId},virtual);
+  const updated=applyCommands(virtual,binding);
+  const next=planned.map(e=>updated.entities.find(v=>v.type===e.type&&v.id===e.id)!);
+  if(!binding.length)return [];
+  return [{action:'PATCH_FIELD',entity:{type:'transactions',id:tx.id,fields:{posting_plan:JSON.stringify(next)}}}];
+ }
  if(c.kind==='CORRECT_TRANSACTION'||c.kind==='CORRECT_IMPORTED_EVENT') {
   const t=get('transactions',c.transactionId);if(!t||t.fields.deleted_at)throw Error('TRANSACTION_UNAVAILABLE');
   assertClear('transactions',t.id);timestamp(c.correctedAt);if(c.kind==='CORRECT_IMPORTED_EVENT')identifier(c.sourceId);
   if(correctionSnapshot(entities,t.id)!==c.expectedSnapshot)throw Error('STALE_TRANSACTION');
-  if(c.replacement.id!==t.id||!['SUCCESS','FAILED'].includes(c.replacement.status||'SUCCESS'))throw Error('INVALID_CORRECTION');
+  if(c.replacement.id!==t.id||!(c.kind==='CORRECT_TRANSACTION'?['SUCCESS','PENDING','FAILED']:['SUCCESS','FAILED']).includes(c.replacement.status||'SUCCESS'))throw Error('INVALID_CORRECTION');
   if(entities.some(e=>e.type==='transaction_links'&&!e.fields.deleted_at&&(e.fields.from_transaction_id===t.id||e.fields.to_transaction_id===t.id)))throw Error('ACTIVE_RETURN_LINKS');
   const clean={...snapshot,entities:entities.filter(e=>!(e.type==='transactions'&&e.id===t.id)&&e.fields.transaction_id!==t.id)};
   const generated=interpret({...c.replacement,source:undefined},clean),result:Command[]=[];
-  const correctionKey=c.kind==='CORRECT_IMPORTED_EVENT'?c.sourceId:c.correctedAt;
+  const correctionKey=c.kind==='CORRECT_IMPORTED_EVENT'?c.sourceId:c.correctedAt+':'+entities.filter(e=>e.type==='balance_movements'&&e.fields.transaction_id===t.id).length;
   const proposed=generated.find(c=>c.entity.type==='transactions')!.entity;
   for(const key of (c.kind==='CORRECT_TRANSACTION'?['event_type','status','occurred_at','display_amount','display_name','note']:['event_type','status','occurred_at','display_amount']))if(t.fields[key]!==proposed.fields[key])result.push({action:'PATCH_FIELD',entity:{type:'transactions',id:t.id,fields:{[key]:proposed.fields[key]}}});
   for(const m of entities.filter(e=>e.type==='balance_movements'&&e.fields.transaction_id===t.id&&e.fields.amount!==0))result.push({action:'PATCH_FIELD',entity:{type:m.type,id:m.id,fields:{amount:0}}});
@@ -70,7 +92,7 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
    }else{result.push(cmd);postings.push(cmd.entity);}
   }
   if(!generated.some(cmd=>cmd.entity.type==='consumption_effects'))for(const e of entities.filter(e=>e.type==='consumption_effects'&&e.fields.transaction_id===t.id&&e.fields.amount!==0))result.push({action:'PATCH_FIELD',entity:{type:e.type,id:e.id,fields:{amount:0}}});
-  result.push({action:'PATCH_FIELD',entity:{type:'transactions',id:t.id,fields:{posting_plan:JSON.stringify(postings)}}});
+  result.push({action:'PATCH_FIELD',entity:{type:'transactions',id:t.id,fields:{posting_plan:proposed.fields.status==='PENDING'?proposed.fields.posting_plan:JSON.stringify(postings)}}});
   if(c.kind==='CORRECT_IMPORTED_EVENT')result.push(create({type:'source_records',id:c.sourceId,fields:{transaction_id:t.id,source_type:'MANUAL',platform:'星账 · 导入修正',created_at:c.correctedAt,raw_payload:JSON.stringify({kind:'IMPORT_CORRECTION',before:JSON.parse(c.expectedSnapshot),after:postings,event:proposed.fields,evidence:c.replacement.source?.rawPayload||null})}}));
   return result;
  }
@@ -223,6 +245,18 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
   if(Date.parse(c.observedAt)<Date.parse(String(a.fields.opening_balance_at)))throw Error('ANCHOR_BEFORE_OPENING');
   return [create({type:'balance_anchors',id:c.observationId,fields:{account_id:c.accountId,observed_balance:c.observedBalance,observed_at:c.observedAt,source_type:c.sourceType,created_at:c.createdAt,deleted_at:null}})];
  }
+ if(c.kind==='ATTACH_SOURCE_EVIDENCE') {
+  const t=get('transactions',c.transactionId);if(!t||t.fields.deleted_at)throw Error('TRANSACTION_UNAVAILABLE');assertClear('transactions',c.transactionId);
+  identifier(c.source.id);if(!['MANUAL','SCREENSHOT','EXCEL'].includes(c.source.sourceType)||!c.source.platform?.trim()||typeof c.source.rawPayload!=='string')throw Error('INVALID_SOURCE');
+  const existing=get('source_records',c.source.id);if(existing){if(existing.fields.transaction_id===c.transactionId&&existing.fields.raw_payload===c.source.rawPayload)return [];throw Error('SOURCE_EVIDENCE_COLLISION');}
+  const createdAt=c.source.capturedAt??String(t.fields.occurred_at);timestamp(createdAt);
+  return [create({type:'source_records',id:c.source.id,fields:{transaction_id:c.transactionId,source_type:c.source.sourceType,platform:c.source.platform,raw_payload:c.source.rawPayload,created_at:createdAt}})];
+ }
+ if(c.kind==='RESTORE_TRANSACTION') {
+  const original=get('transactions',c.transactionId);if(!original||!original.fields.deleted_at||original.fields.purged_at)throw Error('TRANSACTION_UNAVAILABLE');
+  assertClear('transactions',c.transactionId);
+  return [{action:'RESOLVE_CONFLICT',entity:{type:'transactions',id:c.transactionId,fields:{deleted_at:null}}}];
+ }
  if(c.kind==='DELETE_TRANSACTION') {
   timestamp(c.deletedAt);const original=get('transactions',c.transactionId);
   if(!original||original.fields.deleted_at)throw Error('TRANSACTION_UNAVAILABLE');
@@ -251,10 +285,10 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
  commands.push(create({type:'transactions',id:c.id,fields:{event_type:c.kind,status,occurred_at:c.occurredAt,
   display_amount:c.amount,display_name:c.name,note:c.note??'',created_at:c.occurredAt,deleted_at:null}}));
  if(c.source) {
-  identifier(c.source.id);
+  identifier(c.source.id);if(c.source.capturedAt)timestamp(c.source.capturedAt);
   if(!['MANUAL','SCREENSHOT','EXCEL'].includes(c.source.sourceType)||!c.source.platform?.trim()||typeof c.source.rawPayload!=='string')throw Error('INVALID_SOURCE');
   commands.push(create({type:'source_records',id:c.source.id,fields:{transaction_id:c.id,source_type:c.source.sourceType,
-   platform:c.source.platform,raw_payload:c.source.rawPayload,created_at:c.occurredAt}}));
+   platform:c.source.platform,raw_payload:c.source.rawPayload,created_at:c.source.capturedAt??c.occurredAt}}));
  }
  let movementIndex=0;
  const movement=(id:AccountRef,flow:number)=>{
@@ -336,6 +370,10 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
    break;
   }
   default:throw Error('UNSUPPORTED_BUSINESS_COMMAND');
+ }
+ if(status==='PENDING'){
+  const planned=interpret({...c,status:'SUCCESS'} as BusinessCommand,snapshot).filter(command=>!['transactions','source_records'].includes(command.entity.type)).map(command=>command.entity);
+  commands.find(command=>command.entity.type==='transactions')!.entity.fields.posting_plan=JSON.stringify(planned);
  }
  return commands;
 }

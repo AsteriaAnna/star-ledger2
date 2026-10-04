@@ -1,0 +1,42 @@
+{
+  "auditedCodeCommit": "66fd47bc09bb85f4f3a57aa0082f6e1fd56a800e",
+  "scope": "application services and accounting interpreter; synthetic data; no browser or storage failure injection",
+  "findings": [
+    {
+      "id": "REVIVE_OVERWRITES_CORRECTION",
+      "disposition": "REVIVE_EXISTING",
+      "expected": {
+        "amount": 1200,
+        "note": "user-note"
+      },
+      "observed": {
+        "amount": 1000,
+        "note": "source-note"
+      },
+      "violation": true
+    },
+    {
+      "id": "UNANSWERED_SOURCE_UPDATE_LOST_ON_RETRY",
+      "firstDisposition": "SOURCE_UPDATE",
+      "retryDisposition": "SKIP_DUPLICATE",
+      "beforeAttention": 1,
+      "afterAttention": 0,
+      "ledgerAmount": 1000,
+      "sourceAmount": 2000,
+      "expected": "unanswered source update remains actionable",
+      "violation": true
+    },
+    {
+      "id": "FAILED_PREDECESSOR_BREAKS_BATCH",
+      "dispositions": [
+        "NO_EFFECT",
+        "SOURCE_UPDATE",
+        "INTERPRETED"
+      ],
+      "error": "Error: TRANSACTION_UNAVAILABLE",
+      "transactionCount": 0,
+      "expected": "valid successor and unrelated row can be handled without missing-target error",
+      "violation": true
+    }
+  ]
+}

@@ -20,3 +20,13 @@ test('legacy source payload without profile remains compatible only with default
  assert.deepEqual(findSourceMatch({value:'same',platform:'支付宝',profile:'本人',orderId:'same'},entities).activeTransactionIds,['legacy']);
  assert.deepEqual(findSourceMatch({value:'same',platform:'支付宝',profile:'另一个账本身份',orderId:'same'},entities).activeTransactionIds,[]);
 });
+
+
+test('same SourceIdentity distinguishes exact replay from a changed immutable evidence snapshot',()=>{
+ const evolving:Entity={type:'source_records',id:'e1',fields:{transaction_id:'tx',source_type:'EXCEL',platform:'微信',raw_payload:JSON.stringify({version:3,identity:'order-1',profile:'本人',order:'order-1',original:'raw-v1'}),created_at:'2026-09-01T00:00:00Z'}};
+ const entities=[tx('tx'),evolving];
+ const exact=findSourceMatch({value:'order-1',platform:'微信',profile:'本人',orderId:'order-1',rawPayload:'raw-v1'},entities);
+ assert.deepEqual(exact.exactEvidenceTransactionIds,['tx']);assert.deepEqual(exact.changedEvidenceTransactionIds,[]);
+ const changed=findSourceMatch({value:'order-1',platform:'微信',profile:'本人',orderId:'order-1',rawPayload:'raw-v2'},entities);
+ assert.deepEqual(changed.exactEvidenceTransactionIds,[]);assert.deepEqual(changed.changedEvidenceTransactionIds,['tx']);
+});

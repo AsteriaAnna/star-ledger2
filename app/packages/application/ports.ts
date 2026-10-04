@@ -1,4 +1,4 @@
-import type {AttentionItem,ExternalRecord,ImportSession} from '../importing/types.ts';
+import type {AttentionItem,EventInterpretation,ExternalRecord,ImportRecordOutcome,ImportSession} from '../importing/types.ts';
 
 export type AccountIdentity={
  sourceSystem:string;
@@ -32,11 +32,14 @@ export interface ResolutionMemoryRepository {
 
 export interface ImportWorkspaceRepository {
  getSession(id:string):Promise<ImportSession|null>;
+ listSessions():Promise<ImportSession[]>;
  putSession(session:ImportSession):Promise<void>;
  listExternalRecords(sessionId:string):Promise<ExternalRecord[]>;
  putExternalRecords(records:ExternalRecord[]):Promise<void>;
  listAttentionItems(sessionId:string):Promise<AttentionItem[]>;
+ listOutcomes(sessionId:string):Promise<ImportRecordOutcome[]>;
+ replaceOutcomes(sessionId:string,outcomes:ImportRecordOutcome[]):Promise<void>;
  replaceAttentionItems(sessionId:string,items:AttentionItem[]):Promise<void>;
- saveSessionSnapshot(session:ImportSession,records:ExternalRecord[],items:AttentionItem[]):Promise<void>;
+ saveSessionSnapshot(session:ImportSession,records:ExternalRecord[],items:AttentionItem[],interpretations?:EventInterpretation[]):Promise<void>;
  clearSession(id:string):Promise<void>;
 }
