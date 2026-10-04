@@ -18,7 +18,7 @@
     "build:probe": "tsc -p tsconfig.web.json",
     "check:platform": "node scripts/check-platform-boundary.ts",
     "dev:web": "vite --config apps/web/vite.config.ts",
-    "build:web": "vite build --config apps/web/vite.config.ts && node scripts/build-web-sw.mjs",
+    "build:web": "vite build --config apps/web/vite.config.ts && node scripts/build-web-sw.mjs && node scripts/build-development-preview.mjs",
     "preview:web": "vite preview --config apps/web/vite.config.ts --host 127.0.0.1",
     "test:web": "node scripts/test-web-ui.cjs",
     "test:web:imports": "node scripts/test-web-import-v09.cjs",
