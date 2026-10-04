@@ -1,3 +1,4 @@
+import {finalizeImportRefunds} from './import-refund-finalize.ts';
 import type {LedgerSnapshot} from '../../../packages/accounting/index.ts';
 import {ImportStatementService,type ResolveImportResult} from '../../../packages/application/import-service.ts';
 import {planImportCommit,type ImportCommitPlan} from '../../../packages/application/import-commit.ts';
@@ -23,7 +24,7 @@ export async function resumeImportSession(sessionId:string){
  await mutate(store=>{
   if(!store.state.importWorkspace||sourceReviewToken(store.state.importWorkspace,{entities:store.entities,conflicts:store.conflicts})!==plan.expectedToken)throw Error('STALE_SOURCE_REVIEW');
   new BusinessAccountingService(store,store.state.device).executeBatch(plan.execution.commands);
-  store.state.importWorkspace=plan.workspace;
+  store.state.importWorkspace=plan.workspace;finalizeImportRefunds(store,new Date().toISOString());
  });
  return plan.session;
 }
@@ -64,7 +65,7 @@ export async function commitResolvedWebImport(resolved:ResolvedWebImport,now:str
   current.records[session.id]=structuredClone(resolved.records);
   current.attention[session.id]=structuredClone(attention);
   current.outcomes[session.id]=outcomes;
-  store.state.importWorkspace=current;output={execution,session};
+  store.state.importWorkspace=current;finalizeImportRefunds(store,now);output={execution,session:store.state.importWorkspace!.sessions[session.id]};
  });
  if(!output)throw Error('IMPORT_COMMIT_FAILED');
  return output;

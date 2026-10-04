@@ -1,3 +1,5 @@
+import {applyCommands,interpret} from '../accounting/business.ts';
+import {refreshRefundAttention} from './late-refund-relations.ts';
 import type {LedgerSnapshot} from '../accounting/index.ts';
 import {InMemoryImportWorkspace,type ImportWorkspaceSnapshot} from '../importing/workspace.ts';
 import {readAccountMapping} from '../importing/resolution-memory.ts';
@@ -18,8 +20,9 @@ export async function planResumeImport(sessionId:string,workspace:ImportWorkspac
  const prepared=await service.prepare({sessionId,sourceType:session.sourceType,sourceSystem:session.sourceSystem,records,interpretations,ledger,now});
  const resolved=await service.resolve({prepared,records,ledger,now});
  const execution=planImportExecution(planImportCommit(resolved,records),ledger,now);
- const next=memory.snapshot(),attention=next.attention[sessionId];
+ let next=memory.snapshot();const attention=next.attention[sessionId];
  next.outcomes[sessionId]=mergeImportOutcomes(workspace.outcomes[sessionId]??[],importRecordOutcomes(sessionId,execution,now));
  next.sessions[sessionId]=completeImportSessionFromOutcomes(resolved.session,next.outcomes[sessionId],attention,now);
+ let after=ledger;for(const command of execution.commands)after=applyCommands(after,interpret(command,after));next=refreshRefundAttention(next,after,now);
  return {expectedToken,execution,workspace:next,session:next.sessions[sessionId]};
 }

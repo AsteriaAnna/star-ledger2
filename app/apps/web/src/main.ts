@@ -99,7 +99,7 @@ async function persistQueue(){await saveImports(drafts,state.importRevision||0);
 function refreshDrafts(){drafts.forEach(d=>reviewDraft(d,snap.entities,snap.conflicts));const context=refundContext(snap.entities,drafts);drafts.forEach(d=>reviewDraft(d,snap.entities,snap.conflicts,context));}
 function v2ImportSummary(){
  const workspace=state.importWorkspace;if(!workspace)return '';
- const sessions=Object.values(workspace.sessions||{}).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)||a.id.localeCompare(b.id));
+ const sessions=Object.values(workspace.sessions||{}).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||a.id.localeCompare(b.id));
  if(!sessions.length)return '';return sessions.map((session,index)=>index>0&&session.state==='COMPLETED'&&!(workspace.attention[session.id]?.length)?`<details class="panel"><summary>${esc(formatTime(session.updatedAt))} · 已处理 ${session.sourceCount} 条 · 查看导入结果</summary>${v2SessionSummary(session.id)}</details>`:v2SessionSummary(session.id)).join('');
 }
 function v2SessionSummary(sessionId:string){
@@ -112,7 +112,7 @@ function v2SessionSummary(sessionId:string){
  ${['PROCESSING','FAILED'].includes(session.state)?`<p><button class="secondary" data-v2-resume="${esc(session.id)}">继续处理</button></p>`:''}
  <section class="analysis-stats"><div><small>已入账</small><strong>${session.committedCount}</strong></div><div><small>重复跳过</small><strong>${session.skippedDuplicateCount}</strong></div><div><small>无账务影响</small><strong>${session.noEffectCount}</strong></div><div><small>需要确认</small><strong>${blocked.length}</strong></div></section>
  ${blocked.length?`<div class="attention-list"><h3>只需要确认这些问题</h3>${blocked.map(item=>`<div class="import-row"><div><strong>${esc(item.question)}</strong><small>${esc(item.kind==='SOURCE_UPDATE'?'新官方证据已经保留，当前账务没有被静默覆盖':item.kind==='SPLIT_PAYMENT'?'需要真实分摊金额后才能影响各账户余额':'只处理这个缺失信息，不需要重新核对整笔账') }</small></div><button class="secondary" data-v2-attention="${esc(item.id)}" data-session="${esc(session.id)}">处理</button></div>`).join('')}</div>`:''}
- ${later.length?`<details class="batch-tools"><summary>可稍后补充 · ${later.length} 项</summary>${later.map(item=>`<div class="trash-row"><div><strong>${esc(item.question)}</strong><small>${esc(workspace.records[session.id]?.find(record=>record.id===item.externalRecordId)?.facts.channelRaw||'')} · ${esc(workspace.records[session.id]?.find(record=>record.id===item.externalRecordId)?.facts.counterpartyRaw||'')}</small><small>已知账务事实已经记录，不阻塞本次导入。</small></div>${['ACCOUNT','TRANSFER_ENDPOINTS'].includes(item.kind)?`<button class="secondary" data-v2-attention="${esc(item.id)}" data-session="${esc(session.id)}">${item.kind==='ACCOUNT'?'确认账户':'补齐目标账户'}</button>`:''}</div>`).join('')}</details>`:''}
+ ${later.length?`<details class="batch-tools"><summary>可稍后补充 · ${later.length} 项</summary>${later.map(item=>`<div class="trash-row"><div><strong>${esc(item.question)}</strong><small>${esc(workspace.records[session.id]?.find(record=>record.id===item.externalRecordId)?.facts.channelRaw||'')} · ${esc(workspace.records[session.id]?.find(record=>record.id===item.externalRecordId)?.facts.counterpartyRaw||'')}</small><small>已知账务事实已经记录，不阻塞本次导入。</small></div>${['ACCOUNT','TRANSFER_ENDPOINTS','REFUND_RELATION'].includes(item.kind)?`<button class="secondary" data-v2-attention="${esc(item.id)}" data-session="${esc(session.id)}">${item.kind==='ACCOUNT'?'确认账户':item.kind==='REFUND_RELATION'?'选择原账单':'补齐目标账户'}</button>`:''}</div>`).join('')}</details>`:''}
  ${!blocked.length&&session.state==='COMPLETED'?'<p class="positive">这批账单已处理完成，不需要逐条核对。</p>':''}
  <p class="footnote">导入结果已保存在本机，刷新后可继续处理；也会随完整备份保留。</p></section>`;
 }
@@ -156,6 +156,8 @@ function matchCandidates(d:Draft){return safeCandidates(d,snap.entities);}
 async function attachSource(d:Draft,id:string){if(duplicate(d))throw Error('这条来源已经存在，请查看原记录');if(!matchCandidates(d).some(t=>t.id===id))throw Error('请选择候选交易');await mutate(store=>{if(existingSource(d,store.entities).length)throw Error('来源已被另一窗口处理');new AccountingService(store,store.state.device).execute([{action:'CREATE_ENTITY',entity:{type:'source_records',id:'source-'+hash({key:d.key,raw:d.raw}),fields:{transaction_id:id,source_type:d.sourceType,platform:d.platform,raw_payload:JSON.stringify(sourcePayload(d)),created_at:sourceUTC(d.date)}}},ruleCommand(store.entities,'source-'+(d.identity||d.key),{transactionId:id})]);});await refresh();close();toast('已关联来源，没有新增消费');}
 
 async function importAttentionDialog(sessionId:string,attentionId:string){
+ const refundItem=state.importWorkspace?.attention[sessionId]?.find(e=>e.id===attentionId&&e.kind==='REFUND_RELATION');if(refundItem){const outcome=state.importWorkspace?.outcomes[sessionId]?.find(e=>e.externalRecordId===refundItem.externalRecordId);if(!outcome?.transactionId)throw Error('IMPORT_RECORD_NOT_COMMITTED');linkReturnDialog(outcome.transactionId);return;}
+
  const workspace=state.importWorkspace,item=workspace?.attention[sessionId]?.find(value=>value.id===attentionId);
  const source=workspace?.records[sessionId]?.find(value=>value.id===item?.externalRecordId);
  if(!item||!source)throw Error('STALE_IMPORT_ATTENTION');

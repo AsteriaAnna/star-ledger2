@@ -1,3 +1,4 @@
+import {planLateRefundRelations} from './late-refund-relations.ts';
 import type {BusinessCommand} from '../domain/accounting.ts';
 import type {LedgerSnapshot} from '../accounting/index.ts';
 import {applyCommands,interpret} from '../accounting/business.ts';
@@ -44,6 +45,8 @@ export function planImportExecution(plan:ImportCommitPlan,snapshot:LedgerSnapsho
   const restored=advance(working,restore);working=restored.snapshot;commands.push(restore);
   revived.push(revival.transactionId);revivedRecords.push(revival.externalRecordId);
  }
+
+ for(const command of planLateRefundRelations(working)){const next=advance(working,command);working=next.snapshot;commands.push(command);}
 
  return {
   commands,createdIds:created,createdRecordIds:createdRecords,revivedIds:revived,revivedRecordIds:revivedRecords,
