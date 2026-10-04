@@ -2,7 +2,7 @@
 
 ## 当前开发入口
 
-V2 正在 M5，服务基础不等于用户流程已完成。后续工作先遵守[用户与系统职责契约](docs/responsibility-contract.md)，按[M1–M7 唯一当前执行计划](docs/m1-m7-execution-plan.md)逐项交付；[专项对标](docs/2026-10-03-responsibility-benchmark.md)记录采用和不采用的经验。M5.2-A 编辑请求与草稿安全已接通，下一项为 M5.2-B/C：统一财务字段修改与关系维护。
+V2 正在 M5，服务基础不等于用户流程已完成。后续工作先遵守[用户与系统职责契约](docs/responsibility-contract.md)，按[M1–M7 唯一当前执行计划](docs/m1-m7-execution-plan.md)逐项交付；[专项对标](docs/2026-10-03-responsibility-benchmark.md)记录采用和不采用的经验。M5.2-A 编辑请求与草稿安全已接通，M5.2-B/C 主要财务字段和关系维护已接通；下一项先收口旧记录兼容边界，再推进 M5.2-D 批量操作。
 
 以下版本说明与底层记录为既有能力/历史资料，不能代替当前阶段验收。
 

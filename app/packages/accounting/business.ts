@@ -75,11 +75,11 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
   const t=get('transactions',c.transactionId);if(!t||t.fields.deleted_at)throw Error('TRANSACTION_UNAVAILABLE');
   assertClear('transactions',t.id);timestamp(c.correctedAt);if(c.kind==='CORRECT_IMPORTED_EVENT')identifier(c.sourceId);
   if(correctionSnapshot(entities,t.id)!==c.expectedSnapshot)throw Error('STALE_TRANSACTION');
-  if(c.replacement.id!==t.id||!['SUCCESS','FAILED'].includes(c.replacement.status||'SUCCESS'))throw Error('INVALID_CORRECTION');
+  if(c.replacement.id!==t.id||!(c.kind==='CORRECT_TRANSACTION'?['SUCCESS','PENDING','FAILED']:['SUCCESS','FAILED']).includes(c.replacement.status||'SUCCESS'))throw Error('INVALID_CORRECTION');
   if(entities.some(e=>e.type==='transaction_links'&&!e.fields.deleted_at&&(e.fields.from_transaction_id===t.id||e.fields.to_transaction_id===t.id)))throw Error('ACTIVE_RETURN_LINKS');
   const clean={...snapshot,entities:entities.filter(e=>!(e.type==='transactions'&&e.id===t.id)&&e.fields.transaction_id!==t.id)};
   const generated=interpret({...c.replacement,source:undefined},clean),result:Command[]=[];
-  const correctionKey=c.kind==='CORRECT_IMPORTED_EVENT'?c.sourceId:c.correctedAt;
+  const correctionKey=c.kind==='CORRECT_IMPORTED_EVENT'?c.sourceId:c.correctedAt+':'+entities.filter(e=>e.type==='balance_movements'&&e.fields.transaction_id===t.id).length;
   const proposed=generated.find(c=>c.entity.type==='transactions')!.entity;
   for(const key of (c.kind==='CORRECT_TRANSACTION'?['event_type','status','occurred_at','display_amount','display_name','note']:['event_type','status','occurred_at','display_amount']))if(t.fields[key]!==proposed.fields[key])result.push({action:'PATCH_FIELD',entity:{type:'transactions',id:t.id,fields:{[key]:proposed.fields[key]}}});
   for(const m of entities.filter(e=>e.type==='balance_movements'&&e.fields.transaction_id===t.id&&e.fields.amount!==0))result.push({action:'PATCH_FIELD',entity:{type:m.type,id:m.id,fields:{amount:0}}});
@@ -92,7 +92,7 @@ export function interpret(c:BusinessCommand,snapshot:LedgerSnapshot):Command[] {
    }else{result.push(cmd);postings.push(cmd.entity);}
   }
   if(!generated.some(cmd=>cmd.entity.type==='consumption_effects'))for(const e of entities.filter(e=>e.type==='consumption_effects'&&e.fields.transaction_id===t.id&&e.fields.amount!==0))result.push({action:'PATCH_FIELD',entity:{type:e.type,id:e.id,fields:{amount:0}}});
-  result.push({action:'PATCH_FIELD',entity:{type:'transactions',id:t.id,fields:{posting_plan:JSON.stringify(postings)}}});
+  result.push({action:'PATCH_FIELD',entity:{type:'transactions',id:t.id,fields:{posting_plan:proposed.fields.status==='PENDING'?proposed.fields.posting_plan:JSON.stringify(postings)}}});
   if(c.kind==='CORRECT_IMPORTED_EVENT')result.push(create({type:'source_records',id:c.sourceId,fields:{transaction_id:t.id,source_type:'MANUAL',platform:'星账 · 导入修正',created_at:c.correctedAt,raw_payload:JSON.stringify({kind:'IMPORT_CORRECTION',before:JSON.parse(c.expectedSnapshot),after:postings,event:proposed.fields,evidence:c.replacement.source?.rawPayload||null})}}));
   return result;
  }

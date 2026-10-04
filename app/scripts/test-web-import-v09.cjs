@@ -160,6 +160,7 @@ const ali=ah+'2026-09-21 12:00:00,餐饮美食,商户,午餐,支出,10,农业银
  ok('Changing transaction filters or search clears selection without writing ledger operations');
  assert.deepEqual(errors,[]);
  await require('./test-web-detail-edits.cjs')({browser,baseUrl,db,entities,ok,errors});
+ await require('./test-web-financial-edits.cjs')({browser,baseUrl,db,entities,ok,errors});
  assert.deepEqual(errors,[]);
  fs.writeFileSync('/tmp/star-import-v09-validation.json',JSON.stringify({results,errors},null,2));
  }catch(e){if(page){console.error('TOAST',await page.locator('#toast').textContent());console.error((await page.locator('main').innerText()).slice(-2000));}throw e;}finally{await browser?.close();server.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

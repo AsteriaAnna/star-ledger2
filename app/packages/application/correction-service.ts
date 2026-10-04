@@ -16,6 +16,9 @@ export type CorrectionPlan={
  relationReviewIds:string[];
 };
 
+const relationErrors=new Set(['ORIGINAL_UNAVAILABLE','INVALID_RETURN_KIND','RETURN_BEFORE_ORIGINAL','RETURN_EXCEEDS_ORIGINAL','CONSUMPTION_ALLOCATION_REQUIRED','SPONSORED_REFUND_HAS_OWN_ACCOUNT']);
+const expectedRelationError=(error:unknown)=>error instanceof Error&&relationErrors.has(error.message);
+
 const activeLinks=(snapshot:LedgerSnapshot)=>snapshot.entities.filter(e=>e.type==='transaction_links'&&!e.fields.deleted_at);
 const tx=(snapshot:LedgerSnapshot,id:string)=>snapshot.entities.find(e=>e.type==='transactions'&&e.id===id&&!e.fields.deleted_at);
 
@@ -25,7 +28,7 @@ function advance(snapshot:LedgerSnapshot,command:BusinessCommand){
 }
 
 function unlinkedReplacement(replacement:LedgerIntent):LedgerIntent{
- if(replacement.kind==='REFUND'||replacement.kind==='RETURN')return {...replacement,originalId:null};
+ if(replacement.status!=='PENDING'&&(replacement.kind==='REFUND'||replacement.kind==='RETURN'))return {...replacement,originalId:null};
  return replacement;
 }
 
@@ -67,7 +70,7 @@ export function planTransactionCorrection(request:CorrectionRequest,snapshot:Led
   });
   for(const row of ordered){
    const command:BusinessCommand={kind:'LINK_RETURN',transactionId:row.refundId,originalId:request.transactionId};
-   try{trial=advance(trial,command).snapshot;trialCommands.push(command);}catch{valid=false;break;}
+   try{trial=advance(trial,command).snapshot;trialCommands.push(command);}catch(error){if(!expectedRelationError(error))throw error;valid=false;break;}
   }
   if(valid){working=trial;commands.push(...trialCommands);relinked.push(...ordered.map(row=>row.refundId));}
   else review.push(...incoming.map(row=>row.refundId));
@@ -77,7 +80,7 @@ export function planTransactionCorrection(request:CorrectionRequest,snapshot:Led
   const correctedTarget=tx(working,request.transactionId);
   if(!correctedTarget||!['REFUND','RETURN'].includes(String(correctedTarget.fields.event_type))){review.push(row.refundId);continue;}
   const command:BusinessCommand={kind:'LINK_RETURN',transactionId:request.transactionId,originalId:row.originalId};
-  try{working=advance(working,command).snapshot;commands.push(command);relinked.push(row.refundId);}catch{review.push(row.refundId);}
+  try{working=advance(working,command).snapshot;commands.push(command);relinked.push(row.refundId);}catch(error){if(!expectedRelationError(error))throw error;review.push(row.refundId);}
  }
 
  return {

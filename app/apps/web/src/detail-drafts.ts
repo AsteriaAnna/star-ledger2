@@ -1,13 +1,13 @@
-import type {DetailFields} from '../../../packages/application/transaction-edit.ts';
+import {detailFieldNames,type DetailFields} from '../../../packages/application/transaction-edit.ts';
 export type DetailDraft={version:1;device:string;transactionId:string;expectedSnapshot:string;base:DetailFields;values:DetailFields;updatedAt:string};
 export type DraftStorage=Pick<Storage,'getItem'|'setItem'|'removeItem'|'key'|'length'>;
 const prefix=(device:string)=>`star-detail-draft:v1:${encodeURIComponent(device)}:`;
 export const draftKey=(device:string,tab:string,id:string)=>prefix(device)+encodeURIComponent(tab)+':'+encodeURIComponent(id);
 export function changedDetailFields(base:DetailFields,values:DetailFields):Partial<DetailFields>{
- const result:Partial<DetailFields>={};for(const key of ['name','note','category'] as const)if(base[key]!==values[key])result[key]=values[key] as any;
+ const result:Partial<DetailFields>={};for(const key of detailFieldNames)if(base[key]!==values[key])result[key]=values[key] as any;
  return result;
 }
-const fieldsValid=(v:any):v is DetailFields=>v&&typeof v.name==='string'&&typeof v.note==='string'&&(v.category===null||typeof v.category==='string');
+const fieldsValid=(v:any):v is DetailFields=>v&&typeof v.name==='string'&&typeof v.note==='string'&&(v.category===null||typeof v.category==='string')&&detailFieldNames.every(k=>v[k]===undefined||v[k]===null||typeof v[k]==='string');
 export function readDetailDraft(storage:DraftStorage,key:string,device:string):DetailDraft|null{
  if(!key.startsWith(prefix(device)))return null;
  const raw=storage.getItem(key);if(!raw)return null;

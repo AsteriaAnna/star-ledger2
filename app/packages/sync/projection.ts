@@ -35,7 +35,7 @@ export function project(ops:Operation[]) {
    if(sharedRule&&!concurrent)throw Error('CREATE_ID_COLLISION');
   }
   for(const o of list)if(o.action!=='CREATE_ENTITY'&&!creates.some(c=>before(c,o)))throw Error('EDIT_BEFORE_CREATE');
-  const e:Entity={type:list[0].entity.type,id:list[0].entity.id,fields:list[0].entity.type==='transactions'?{posting_plan:null,purged_at:null}:list[0].entity.type==='transaction_links'?{deleted_at:null}:{}};
+  const e:Entity={type:list[0].entity.type,id:list[0].entity.id,fields:list[0].entity.type==='transactions'?{posting_plan:null,purged_at:null,user_edits:null}:list[0].entity.type==='transaction_links'?{deleted_at:null}:{}};
   const addConflict=(field:string,candidates:{operation_id:string;value:Json}[])=>conflicts.push({id:JSON.stringify([key,field]),entity_type:e.type,entity_id:e.id,field,candidates});
   for(const field of new Set(list.flatMap(o=>Object.keys(o.entity.fields)))) {
    const heads=maximal(list.filter(o=>Object.hasOwn(o.entity.fields,field)));
