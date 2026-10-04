@@ -23,7 +23,7 @@ npx --package=@cloudbase/cli@3.8.5 tcb functions:deploy star-ledger-sync --runti
 npx --package=@cloudbase/cli@3.8.5 tcb hosting:deploy ../web-dist / --env-id xingzhang-dev-d0g4a950c6f1204d1 --verify
 ```
 
-不要加 prune。部署前确认该环境静态托管已开启且没有其他应保留的站点；认证添加实际站点域名。静态构建目前不包含本地 OCR 字库/内核，P15 未达标，不承诺无 VPN。
+不要加 prune。部署前确认该环境静态托管已开启且没有其他应保留的站点；认证添加实际站点域名。静态构建包含同源 OCR worker、内核和中英文字库（部署总量约 33 MiB），首次识别只下载当前设备所需资源并缓存；网站首次打开不会预下载全部字库。资源准备后断网重开识别已通过本地浏览器验证。CloudBase 托管、国内无 VPN 和真机尚未验收，P15 未达标。
 
 ## 必须真实验收
 
