@@ -5,7 +5,7 @@ import {resolve,join} from 'node:path';
 
 const app=process.cwd(),repo=resolve(app,'..');
 const release=JSON.parse(readFileSync(join(app,'docs/development-preview.json'),'utf8'));
-if(!/^[a-f0-9]{40}$/.test(release.sourceCommit)||!/^m5-\d{8}$/.test(release.slug))throw Error('INVALID_PREVIEW_RELEASE');
+if(!/^[a-f0-9]{40}$/.test(release.sourceCommit)||!/^m5-\d{8}(?:-clean)?$/.test(release.slug))throw Error('INVALID_PREVIEW_RELEASE');
 const temporary=mkdtempSync(join(tmpdir(),'star-ledger-preview-'));
 try{
  try{execFileSync('git',['cat-file','-e',`${release.sourceCommit}^{commit}`],{cwd:repo,stdio:'pipe'});}
@@ -24,8 +24,7 @@ try{
  writeFileSync(sw,swText.replaceAll('star-ledger-next-',cachePrefix));
  execFileSync(process.execPath,[join(app,'node_modules/vite/bin/vite.js'),'build','--config','apps/web/vite.config.ts'],{cwd:source,stdio:'inherit'});
  const index=join(source,'web-dist/index.html');
- const notice=`<aside id="development-preview" style="position:relative;z-index:2;padding:10px 20px;background:#203c32;color:#e2f1e9;font:14px/1.6 system-ui;text-align:center">开发预览 · ${release.date} · ${release.sourceCommit.slice(0,7)} · 独立体验账本　<a href="#settings" style="color:#c7e9b3">设置中可体验演示账本</a></aside>`;
- writeFileSync(index,readFileSync(index,'utf8').replace('<title>星账 · 个人账本</title>','<title>星账 · M5 开发预览</title>').replace('<body>','<body>'+notice));
+ writeFileSync(index,readFileSync(index,'utf8').replace('</head>',`<meta name="star-ledger-source" content="${release.sourceCommit}"></head>`));
  execFileSync(process.execPath,['scripts/build-web-sw.mjs'],{cwd:source,stdio:'inherit'});
  const output=join(app,'web-dist/preview',release.slug);mkdirSync(output,{recursive:true});cpSync(join(source,'web-dist'),output,{recursive:true});
  writeFileSync(join(output,'version.json'),JSON.stringify({...release,storage:dbName,cachePrefix},null,2));
