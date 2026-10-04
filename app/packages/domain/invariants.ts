@@ -23,7 +23,7 @@ export function financialIssues(entities:Entity[]):FinancialIssue[] {
   groups.set(target,entries);
  }
  for(const t of txs.filter(t=>active(t)&&['INTERNAL_TRANSFER','WITHDRAWAL'].includes(t.fields.event_type as string))) {
-  const movements=entities.filter(e=>e.type==='balance_movements'&&e.fields.transaction_id===t.id);
+  const movements=entities.filter(e=>e.type==='balance_movements'&&e.fields.transaction_id===t.id&&e.fields.amount!==0);
   const known=movements.map(e=>e.fields.account_id).filter(id=>id!==null);
   if(new Set(known).size!==known.length)issues.push({transactionId:t.id,code:'SAME_ACCOUNT_TRANSFER',involved:[t.id]});
  }

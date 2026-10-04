@@ -34,3 +34,13 @@ test('corrupt device-local workspace fails closed and preserves recovery bytes',
  assert.throws(()=>new LocalImportWorkspace(storage),/CORRUPT_IMPORT_WORKSPACE/);
  assert.equal(storage.getItem('star-ledger:v2:import-workspace'),'{broken');
 });
+
+
+test('unfinished sessions can be rediscovered after reload without a second active-session pointer',async()=>{
+ const storage=new MemoryStorage(),first=new LocalImportWorkspace(storage);
+ await first.saveSessionSnapshot(session,[record],[attention]);
+ await first.putSession({...session,id:'older',updatedAt:'2026-10-01T10:00:00Z',sourceCount:0,blockingAttentionCount:0,state:'COMPLETED'});
+ const second=new LocalImportWorkspace(storage),sessions=await second.listSessions();
+ assert.deepEqual(sessions.map(value=>value.id),['session-1','older']);
+ assert.equal(sessions.find(value=>value.state==='NEEDS_ATTENTION')?.id,'session-1');
+});

@@ -7,7 +7,7 @@ test('official rows preserve refunds, sponsors, pending status and internal tran
  assert.equal(rows[0].sponsor,true);assert.equal(rows[1].kind,'REFUND');assert.equal(rows[1].selected,true);assert.equal(rows[2].kind,'INTERNAL_TRANSFER');assert.equal(rows[2].selected,false);assert.equal(rows[3].status,'PENDING');
 });
 test('CSV handles BOM, quoted commas and embedded newlines',()=>{const rows=csv('\uFEFF交易时间,金额(元),交易对方\r\n2026-09-20 12:00:00,44.00,"商户,\n分店"');assert.equal(rows[1][2],'商户,\n分店');});
-test('money is integer cents and invalid amounts fail',()=>{assert.equal(money('￥1,234.50'),123450);assert.throws(()=>money('1.005'));assert.throws(()=>money('-44'));});
+test('money is integer cents and invalid amounts fail',()=>{assert.equal(money('￥1,234.50'),123450);assert.throws(()=>money('1.005'));assert.throws(()=>money('-44'));assert.equal(money('0.00',true),0);assert.throws(()=>money('0.00'));assert.throws(()=>money('',true));assert.throws(()=>money('0.000',true));});
 test('screenshot parser does not substitute current date when recognition misses it',()=>{const d=parseScreenshot('微信支付\n收款方 测试商户\n￥44.00\n支付成功','hash');assert.equal(d.amount,'44.00');assert.equal(d.date,'');assert.equal(d.selected,false);});
 test('无单号来源用内容指纹稳定识别，跨文件不漂移',()=>{
  const noOrder=(amount='44.50',date='2026-09-20 12:00:00')=>[date,'餐饮美食','商户','午餐','支出',amount,'余额','交易成功',''];

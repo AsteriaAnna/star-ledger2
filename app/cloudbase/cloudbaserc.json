@@ -1,0 +1,5 @@
+{
+ "envId":"xingzhang-dev-d0g4a950c6f1204d1",
+ "functionRoot":"./functions",
+ "functions":[{"name":"star-ledger-sync","runtime":"Nodejs20.19","handler":"index.main","timeout":30,"memorySize":256,"installDependency":true}]
+}

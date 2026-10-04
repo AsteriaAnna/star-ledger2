@@ -23,16 +23,17 @@ const eventKind=(kind:string):InterpretedEventKind=>{
 const amountFen=(draft:Draft)=>{try{return money(draft.amount);}catch{return null;}};
 const occurredAt=(draft:Draft)=>{try{return sourceUTC(draft.date);}catch{return null;}};
 
-export function legacyDraftToExternalRecord(draft:Draft,sessionId:string,capturedAt:string):ExternalRecord{
+export function legacyDraftToExternalRecord(draft:Draft,sessionId:string,capturedAt:string,observationId?:string):ExternalRecord{
  const row=rawObject(draft.raw);
  const facts:NormalizedSourceFacts={
   occurredAt:occurredAt(draft),
   amountFen:amountFen(draft),
-  feeFen:(()=>{if(draft.kind==='WITHDRAWAL'&&draft.platform==='微信'&&(draft.blockers||[]).includes('TRANSFER')&&(draft.fee||'0')==='0')return null;try{return money(draft.fee||'0');}catch{return null;}})(),
+  feeFen:(()=>{if(draft.kind==='WITHDRAWAL'&&draft.platform==='微信'&&(draft.blockers||[]).includes('TRANSFER')&&(draft.fee||'0')==='0')return null;try{return money(draft.fee||'0',true);}catch{return null;}})(),
   transactionTypeRaw:first(row,['交易类型','交易分类']),
   directionRaw:first(row,['收/支','收支']),
   statusRaw:first(row,['当前状态','交易状态','状态']),
-  channelRaw:first(row,['支付方式','收/付款方式','付款方式'])||draft.channel,
+  channelRaw:draft.kind==='WITHDRAWAL'&&draft.platform==='微信'?'零钱':first(row,['支付方式','收/付款方式','付款方式'])||draft.channel,
+  targetChannelRaw:draft.kind==='WITHDRAWAL'&&draft.platform==='微信'?draft.channel:draft.kind==='INTERNAL_TRANSFER'&&draft.platform==='微信'&&/充值/.test(first(row,['交易类型']))?'零钱':draft.kind==='REPAYMENT'&&/花呗/.test(draft.name+' '+draft.raw)?'花呗':undefined,
   counterpartyRaw:first(row,['交易对方','对方名称']),
   productRaw:first(row,['商品说明','商品名称','商品']),
   noteRaw:first(row,['备注']),
@@ -43,7 +44,7 @@ export function legacyDraftToExternalRecord(draft:Draft,sessionId:string,capture
   precision:draft.precision||'invalid'
  };
  return {
-  id:draft.itemId||draft.identity||draft.key,
+  id:observationId??(draft.itemId||draft.identity||draft.key),
   sessionId,
   sourceIdentity:draft.identity||draft.key,
   sourceType:draft.sourceType,
