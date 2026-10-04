@@ -62,6 +62,7 @@ export function legacyAccountMemoryMigrations(entities:Entity[],migratedAt:strin
 
 export function legacyAccountMemoryMigrationCommands(entities:Entity[],migratedAt:string):Command[]{
  return legacyAccountMemoryMigrations(entities,migratedAt)
-  .filter(value=>!readAccountMapping(entities,value.key))
+  // A tombstone is an explicit forget decision, not missing memory to recreate.
+  .filter(value=>!entities.some(e=>e.type==='import_rules'&&e.id===accountMappingKey(value.key)))
   .map(value=>rememberAccountMappingCommand(entities,value.key,value.mapping));
 }

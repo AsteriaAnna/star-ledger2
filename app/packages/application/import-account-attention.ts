@@ -8,7 +8,7 @@ import {accountMappingKey,rememberAccountMappingCommand} from '../importing/reso
 import {describeFundingChannel} from '../importing/channel.ts';
 import {completeImportSessionFromOutcomes} from './import-execution.ts';
 
-export type ImportAccountAnswer={sessionId:string;attentionId:string;accountId:string;createAccount?:CreateAccount;now:string};
+export type ImportAccountAnswer={sessionId:string;attentionId:string;accountId:string;createAccount?:CreateAccount;now:string;remember?:boolean};
 
 /** Plan against the current ledger and workspace inside the caller's transaction. */
 export function planImportAccountAnswer(input:ImportAccountAnswer,workspace:ImportWorkspaceSnapshot,ledger:LedgerSnapshot){
@@ -63,7 +63,7 @@ export function planImportAccountAnswer(input:ImportAccountAnswer,workspace:Impo
   resolvedIds.add(item.id);
  }
  if(!resolvedIds.has(selected.id))throw Error('STALE_IMPORT_ATTENTION');
- commands.push(rememberAccountMappingCommand(working.entities,resolution.memoryKey,{accountId:input.accountId,rememberedAt:input.now}));
+ if(input.remember!==false)commands.push(rememberAccountMappingCommand(working.entities,resolution.memoryKey,{accountId:input.accountId,rememberedAt:input.now}));
  const next=structuredClone(workspace);
  next.attention[input.sessionId]=items.filter(item=>!resolvedIds.has(item.id));
  next.sessions[input.sessionId]=completeImportSessionFromOutcomes(session,outcomes,next.attention[input.sessionId],input.now);
