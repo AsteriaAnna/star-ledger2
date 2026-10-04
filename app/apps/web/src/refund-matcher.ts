@@ -2,11 +2,10 @@ import type {Entity} from '../../../packages/domain/index.ts';
 import type {Draft} from './importer.ts';
 import {money} from './importer.ts';
 import {sourceUTC} from './normalize.ts';
+import {refundOriginalOrder} from '../../../packages/importing/refund-order.ts';
 export const importTransactionId=(d:Draft)=>d.transactionId||'import-'+(d.identity||d.key);
 export function originalOrderCandidates(d:Draft){
- if(d.originalOrder)return [d.originalOrder];
- if(d.platform!=='支付宝')return [];
- const at=d.order.search(/\*|_/);return at>0?[d.order.slice(0,at)]:[];
+ const order=refundOriginalOrder(d.platform,d.order,d.originalOrder);return order?[order]:[];
 }
 function rawFields(d:Draft):Record<string,string>{try{return JSON.parse(d.raw);}catch{return {};}}
 function merchant(value:string){return value.replace(/[-－—]退款$|^退款[-－—]?|\s/g,'');}

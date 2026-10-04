@@ -7,6 +7,7 @@ import {resolveAccount,type AccountResolutionRequest} from '../importing/account
 import {accountMappingKey,rememberAccountMappingCommand} from '../importing/resolution-memory.ts';
 import {describeFundingChannel} from '../importing/channel.ts';
 import {completeImportSessionFromOutcomes} from './import-execution.ts';
+import {planImportAccountReevaluation} from './import-account-reevaluation.ts';
 
 export type ImportAccountAnswer={sessionId:string;attentionId:string;accountId:string;createAccount?:CreateAccount;now:string;remember?:boolean};
 
@@ -63,9 +64,10 @@ export function planImportAccountAnswer(input:ImportAccountAnswer,workspace:Impo
   resolvedIds.add(item.id);
  }
  if(!resolvedIds.has(selected.id))throw Error('STALE_IMPORT_ATTENTION');
- if(input.remember!==false)commands.push(rememberAccountMappingCommand(working.entities,resolution.memoryKey,{accountId:input.accountId,rememberedAt:input.now}));
+ if(input.remember!==false){const memory=rememberAccountMappingCommand(working.entities,resolution.memoryKey,{accountId:input.accountId,rememberedAt:input.now});commands.push(memory);working=applyCommands(working,[memory]);}
  const next=structuredClone(workspace);
  next.attention[input.sessionId]=items.filter(item=>!resolvedIds.has(item.id));
  next.sessions[input.sessionId]=completeImportSessionFromOutcomes(session,outcomes,next.attention[input.sessionId],input.now);
- return {commands,workspace:next,resolvedCount:resolvedIds.size};
+ const reevaluated=planImportAccountReevaluation(next,working,input.now);
+ return {commands:[...commands,...reevaluated.commands],workspace:reevaluated.workspace,resolvedCount:resolvedIds.size+reevaluated.resolvedCount};
 }

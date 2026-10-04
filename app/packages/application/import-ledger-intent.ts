@@ -25,6 +25,7 @@ export function importSourcePayload(source:ExternalRecord){
   refundId:source.facts.refundId,
   sourceSystem:source.sourceSystem,
   channel:source.facts.channelRaw,
+  targetChannel:source.facts.targetChannelRaw??null,
   original:source.rawPayload,
   parserVersion:source.parserVersion,
   precision:source.facts.precision
@@ -50,23 +51,24 @@ export function buildImportedLedgerIntent(input:LedgerIntentBuildInput):LedgerIn
  const sponsored=relationSponsored??sourceSponsored;
  const relationAccount=resolved.relation?.state==='RESOLVED'?resolved.relation.destinationAccountId:null;
  const primary=account??relationAccount??null;
+ const target=resolved.targetAccount?.state==='RESOLVED'?resolved.targetAccount.accountId:null;
  const originalId=resolved.relation?.state==='RESOLVED'&&!resolved.attention.some(a=>a.kind==='CONSUMPTION_ALLOCATION')?resolved.relation.originalId:null;
 
  switch(interpretation.eventKind){
   case 'PURCHASE':return {...base,kind:'PURCHASE',payer:sponsored?null:primary,categoryId:interpretation.categorySuggestion??undefined,funding:sponsored?'EXTERNAL_SPONSOR':'OWN'};
   case 'INCOME':case 'TRANSFER_IN':return {...base,kind:interpretation.eventKind,destination:primary};
-  case 'INTERNAL_TRANSFER':return {...base,kind:'INTERNAL_TRANSFER',from:primary,to:null};
+  case 'INTERNAL_TRANSFER':return {...base,kind:'INTERNAL_TRANSFER',from:primary,to:target};
   case 'WITHDRAWAL':{
    const fee=source.facts.feeFen;
    if(fee===null||fee===undefined||!Number.isSafeInteger(fee)||fee<0)throw Error('WITHDRAWAL_FEE_UNRESOLVED');
-   return {...base,kind:'WITHDRAWAL',from:primary,to:null,fee};
+   return {...base,kind:'WITHDRAWAL',from:primary,to:target,fee};
   }
   case 'EXTERNAL_TRANSFER':case 'DEPOSIT':case 'RED_PACKET':
    // Transfer form alone never implies consumption. Consumption meaning is an independent, later-editable decision.
    return {...base,kind:interpretation.eventKind,from:primary,consumptionAmount:0};
   case 'REFUND':case 'RETURN':
    return {...base,kind:interpretation.eventKind,originalId,destination:sponsored?null:primary,funding:sponsored?'EXTERNAL_SPONSOR':'OWN'};
-  case 'REPAYMENT':return {...base,kind:'REPAYMENT',from:primary,to:null};
+  case 'REPAYMENT':return {...base,kind:'REPAYMENT',from:primary,to:target};
   default:throw Error('IMPORT_EVENT_NOT_POSTABLE');
  }
 }

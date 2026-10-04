@@ -1,8 +1,19 @@
 import {sha256} from '@noble/hashes/sha256';
 import {bytesToHex} from '@noble/hashes/utils';
 import type {Command,LedgerSnapshot} from '../accounting/index.ts';
-import {accountMappingKey} from '../importing/resolution-memory.ts';
+import {accountMappingKey,rememberAccountMappingCommand} from '../importing/resolution-memory.ts';
 import {channelKey,describeFundingChannel} from '../importing/channel.ts';
+import {resolveAccount} from '../importing/account-resolution.ts';
+
+export function planSetAccountAlias(input:{accountId:string;platform:'微信'|'支付宝';profile:string;channel:string;expectedSnapshot:string;now:string},ledger:LedgerSnapshot):Command[]{
+ const context=accountMemoryContext(ledger);
+ if(input.expectedSnapshot!==context.expectedSnapshot)throw Error('STALE_ACCOUNT_MEMORY');
+ const profile=input.profile.trim(),channel=input.channel.trim();
+ if(!profile||!channel)throw Error('ACCOUNT_ALIAS_REQUIRED');
+ const result=resolveAccount({eventKind:'PURCHASE',sourceSystem:sourceSystem(input.platform),platform:input.platform,profile,channelRaw:channel,role:'ACCOUNT',sponsored:/亲情卡|亲属卡/.test(channel),rememberedAccountId:input.accountId},ledger.entities,ledger.conflicts);
+ if(result.state!=='RESOLVED'||result.accountId!==input.accountId||!result.memoryKey)throw Error('ACCOUNT_ALIAS_NOT_APPLICABLE');
+ return [rememberAccountMappingCommand(ledger.entities,result.memoryKey,{accountId:input.accountId,rememberedAt:input.now})];
+}
 
 const isMemory=(id:string)=>['alias-','instrument-','v2-account:'].some(prefix=>id.startsWith(prefix));
 const sourceSystem=(platform:string)=>platform==='微信'?'WECHAT':platform==='支付宝'?'ALIPAY':'UNKNOWN';

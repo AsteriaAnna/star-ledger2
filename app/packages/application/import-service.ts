@@ -5,7 +5,7 @@ import {findSourceMatch} from '../importing/dedup.ts';
 import {createAttention,summarizeSession} from '../importing/attention.ts';
 import type {AttentionItem,EventInterpretation,ExternalRecord,ImportSession,ImportSourceType,SourceSystem} from '../importing/types.ts';
 import type {ImportWorkspaceRepository,ResolutionMemoryRepository} from './ports.ts';
-import {resolveAccount,type AccountResolution,type AccountResolutionRequest} from '../importing/account-resolution.ts';
+import {resolveAccount,resolveLedgerAccount,type AccountResolution,type AccountResolutionRequest} from '../importing/account-resolution.ts';
 import {resolveRefundRelation,type RefundRelationResolution} from '../importing/relation-resolution.ts';
 import {emptyChannel} from '../importing/channel.ts';
 import {resolveReturnAllocation} from '../domain/return-allocation.ts';
@@ -28,6 +28,7 @@ export type PrepareImportResult={
 export type ResolvedImportRecord=PreparedImportRecord&{
  ledgerState:'READY_FOR_LEDGER'|'NOT_APPLICABLE'|'NEEDS_ATTENTION';
  account:AccountResolution|null;
+ targetAccount?:AccountResolution|null;
  relation:RefundRelationResolution|null;
 };
 
@@ -69,8 +70,8 @@ export class ImportStatementService {
  constructor(workspace:ImportWorkspaceRepository,memories?:ResolutionMemoryRepository){this.workspace=workspace;this.memories=memories;}
 
  async resolveFundingAccount(request:AccountResolutionRequest,ledger:LedgerSnapshot){
-  const deterministic=resolveAccount({...request,rememberedAccountId:null},ledger.entities,ledger.conflicts);
-  if(deterministic.state==='RESOLVED'||deterministic.state==='NOT_APPLICABLE'||!deterministic.memoryKey||!this.memories)return deterministic;
+  const deterministic=resolveLedgerAccount({...request,rememberedAccountId:null},ledger.entities,ledger.conflicts);
+  if(['RESOLVED','NOT_APPLICABLE','CONFLICT','INVALID_MEMORY'].includes(deterministic.state)||!deterministic.memoryKey||!this.memories)return deterministic;
   const remembered=await this.memories.findAccountMapping(deterministic.memoryKey);
   if(!remembered)return deterministic;
   return resolveAccount({...request,rememberedAccountId:remembered.accountId},ledger.entities,ledger.conflicts);
@@ -138,10 +139,10 @@ export class ImportStatementService {
     items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'AMOUNT',question:'无法确定这笔提现的手续费金额',blocking:true,candidates:[],createdAt:input.now}));
    }
 
-   if(interpretation.eventKind==='REPAYMENT'){
-    items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'TRANSFER_ENDPOINTS',question:'还款已记录，仍需确认还款的负债账户',blocking:false,candidates:accountCandidates,createdAt:input.now}));
-   }else if(['INTERNAL_TRANSFER','WITHDRAWAL'].includes(interpretation.eventKind)){
-    items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'TRANSFER_ENDPOINTS',question:'已记录资金变化，另一端账户仍待补充',blocking:false,candidates:[],createdAt:input.now}));
+   let targetAccount:AccountResolution|null=null;
+   if(['REPAYMENT','INTERNAL_TRANSFER','WITHDRAWAL'].includes(interpretation.eventKind)){
+    targetAccount=await this.resolveFundingAccount({eventKind:interpretation.eventKind,sourceSystem:source.sourceSystem,platform:source.platformRaw,profile:source.profile,channelRaw:source.facts.targetChannelRaw||'',role:'TARGET',sponsored:false},working);
+    if(targetAccount.state!=='RESOLVED')items.push(createAttention({sessionId:input.prepared.session.id,externalRecordId:source.id,kind:'TRANSFER_ENDPOINTS',question:interpretation.eventKind==='REPAYMENT'?'还到哪个信用账户？':'转入哪个账户？',blocking:false,candidates:(targetAccount.candidates||[]).map(id=>({id,label:String(working.entities.find(e=>e.type==='accounts'&&e.id===id)?.fields.name||id)})),createdAt:input.now}));
    }
 
    if(relation?.state==='RESOLVED'&&relation.originalId&&interpretation.amountFen!==null){
@@ -170,7 +171,7 @@ export class ImportStatementService {
    }
 
    allAttention.push(...items);
-   const value:ResolvedImportRecord={...prepared,ledgerState:items.some(item=>item.blocking)?'NEEDS_ATTENTION':'READY_FOR_LEDGER',account,relation,attention:items};
+   const value:ResolvedImportRecord={...prepared,ledgerState:items.some(item=>item.blocking)?'NEEDS_ATTENTION':'READY_FOR_LEDGER',account,targetAccount,relation,attention:items};
    resolved.push(value);
    if(value.disposition==='INTERPRETED'&&value.ledgerState==='READY_FOR_LEDGER'){
     const intent=buildImportedLedgerIntent({resolved:value,source});

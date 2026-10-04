@@ -1,5 +1,6 @@
 import type {Conflict,Entity} from '../domain/index.ts';
 import {channelKey,describeFundingChannel,emptyChannel,needsSplitFunding} from './channel.ts';
+import {accountMappingKey,readAccountMapping} from './resolution-memory.ts';
 
 export type AccountRole='ACCOUNT'|'TARGET';
 export type AccountResolutionRequest={
@@ -69,4 +70,23 @@ export function resolveAccount(request:AccountResolutionRequest,entities:Entity[
 
  const weak=descriptor?.last4?accounts.filter(a=>String(a.fields.last4||'')===descriptor.last4).map(a=>a.id):[];
  return {state:weak.length?'SUGGESTED':'UNRESOLVED',accountId:null,candidates:weak,reason:weak.length?'有尾号相同的账户，需要确认':'没有找到对应账户，可绑定已有账户或新建',memoryKey};
+}
+
+/** Confirmed card identity survives renaming and payment platforms; wallet aliases remain scoped. */
+export function resolveLedgerAccount(request:AccountResolutionRequest,entities:Entity[],conflicts:Conflict[]=[]):AccountResolution{
+ const base=resolveAccount(request,entities,conflicts),key=base.memoryKey;
+ if(base.state==='RESOLVED'||!key)return base;
+ const exactId=accountMappingKey(key),exact=entities.find(e=>e.type==='import_rules'&&e.id===exactId);
+ if(conflicts.some(c=>c.entity_type==='import_rules'&&c.entity_id===exactId))return {...base,state:'CONFLICT',reason:'账户关系存在同步冲突'};
+ const direct=readAccountMapping(entities,key);
+ if(direct)return resolveAccount({...request,rememberedAccountId:direct.accountId},entities,conflicts);
+ // An explicit forget decision must not be recreated through another alias.
+ if(exact||!/^.+:(?:credit|debit):\d{4}$/.test(key.channelKey))return base;
+ const matching=entities.filter(e=>e.type==='import_rules'&&e.fields.value).flatMap(e=>{
+  try{const value=JSON.parse(String(e.fields.value));return value.identity?.profile===key.profile&&value.identity?.channelKey===key.channelKey&&typeof value.accountId==='string'?[{id:e.id,accountId:value.accountId}]:[];}catch{return [];}
+ });
+ if(matching.some(m=>conflicts.some(c=>c.entity_type==='import_rules'&&c.entity_id===m.id)))return {...base,state:'CONFLICT',reason:'银行卡关系存在同步冲突'};
+ const ids=[...new Set(matching.map(m=>m.accountId))];
+ if(ids.length===1)return resolveAccount({...request,rememberedAccountId:ids[0]},entities,conflicts);
+ return base;
 }

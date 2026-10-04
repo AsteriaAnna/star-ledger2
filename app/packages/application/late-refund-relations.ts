@@ -1,3 +1,4 @@
+import {refundOriginalOrder} from '../importing/refund-order.ts';
 import type {LedgerSnapshot} from '../accounting/index.ts';
 import type {BusinessCommand} from '../domain/accounting.ts';
 import {applyCommands,interpret} from '../accounting/business.ts';
@@ -19,7 +20,7 @@ export function planLateRefundRelations(snapshot:LedgerSnapshot):BusinessCommand
  for(const refund of originals.filter(e=>['REFUND','RETURN'].includes(String(e.fields.event_type)))){
   if(refund.fields.user_edits){try{const edited=JSON.parse(String(refund.fields.user_edits));if(edited.version!==1||!Array.isArray(edited.fields))throw Error();if(edited.fields.includes('category'))continue;}catch{throw Error('INVALID_USER_EDIT_HISTORY');}}
   if(relationDecision(snapshot,refund.id)!==undefined||snapshot.entities.some(e=>e.type==='transaction_links'&&e.fields.from_transaction_id===refund.id))continue;
-  const claims=sources.filter(e=>e.transactionId===refund.id).flatMap(e=>{const order=e.originalOrder??(e.platform==='支付宝'?e.order?.match(/^(.+?)(?:\*REFUND_\d+|_\d+)$/)?.[1]:null);return order?[{...e,originalOrder:order}]:[];});
+  const claims=sources.filter(e=>e.transactionId===refund.id).flatMap(e=>{const order=refundOriginalOrder(e.platform,e.order,e.originalOrder);return order?[{...e,originalOrder:order}]:[];});
   if(!claims.length)continue;
   const targets=new Set<string>();let ambiguous=false;
   for(const claim of claims){
@@ -53,7 +54,7 @@ export function refreshRefundAttention(workspace:ImportWorkspaceSnapshot,ledger:
    if(!tx||tx.fields.status!=='SUCCESS'||!['REFUND','RETURN'].includes(String(tx.fields.event_type)))return [item];
    if(relationDecision(ledger,tx.id)?.originalId===null||ledger.entities.some(e=>e.type==='transaction_links'&&!e.fields.deleted_at&&e.fields.from_transaction_id===tx.id)){changed=true;return [];}
    const context=refundRelationContext(ledger,tx.id),candidateIds=new Set(item.candidates.map(e=>e.id));
-   const candidates=context.candidates.map(e=>({id:e.id,label:String(e.fields.display_name),detail:String(e.fields.occurred_at)}));
+   const candidates=context.suggested.map(e=>({id:e.id,label:String(e.fields.display_name),detail:String(e.fields.occurred_at)}));
    if(candidates.length!==candidateIds.size||candidates.some(e=>!candidateIds.has(e.id)))changed=true;
    return [{...item,candidates}];
   });

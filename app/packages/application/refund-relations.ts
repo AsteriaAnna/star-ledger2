@@ -2,6 +2,7 @@ import {returnAllocationContext} from '../accounting/return-context.ts';
 import type {Command,LedgerSnapshot} from '../accounting/index.ts';
 import {applyCommands,interpret} from '../accounting/business.ts';
 import type {Entity} from '../domain/index.ts';
+import {resolveRefundRelation} from '../importing/relation-resolution.ts';
 const expectedErrors=new Set(['ORIGINAL_UNAVAILABLE','INVALID_RETURN_KIND','RETURN_BEFORE_ORIGINAL','RETURN_EXCEEDS_ORIGINAL','CONSUMPTION_ALLOCATION_REQUIRED','SPONSORED_REFUND_HAS_OWN_ACCOUNT','REFUND_CONSUMPTION_EXCEEDED','REFUND_NONCONSUMPTION_EXCEEDED']);
 const businessError=(error:unknown)=>error instanceof Error&&expectedErrors.has(error.message);
 const active=(snapshot:LedgerSnapshot,id:string)=>snapshot.entities.find(e=>e.type==='transactions'&&e.id===id&&!e.fields.deleted_at&&!e.fields.purged_at);
@@ -22,7 +23,13 @@ export function refundRelationContext(snapshot:LedgerSnapshot,id:string){
   try{const allocation=returnAllocationContext(working.entities,id,row.id);interpret({kind:'LINK_RETURN',transactionId:id,originalId:row.id,consumptionReduction:allocation.minimum},working);candidates.push(row);allocations[row.id]=allocation;}catch(error){if(!businessError(error))throw error;}
  }
  candidates.sort((a,b)=>String(b.fields.occurred_at).localeCompare(String(a.fields.occurred_at))||a.id.localeCompare(b.id));
- return {refund,originalId:link?String(link.fields.to_transaction_id):null,candidates,allocations,currentReduction:link?-Number(snapshot.entities.find(e=>e.type==='consumption_effects'&&e.fields.transaction_id===id)?.fields.amount??0):undefined,expectedSnapshot:relationToken(snapshot)};
+ const suggestions=snapshot.entities.filter(e=>e.type==='source_records'&&e.fields.transaction_id===id).flatMap(source=>{
+  let data:any,original:any;try{data=JSON.parse(String(source.fields.raw_payload));original=JSON.parse(data.original||'{}');}catch{return [];}
+  const result=resolveRefundRelation({kind:refund.fields.event_type as 'REFUND'|'RETURN',amountFen:Number(refund.fields.display_amount),occurredAt:String(refund.fields.occurred_at),platform:String(source.fields.platform),profile:data.profile||'本人',displayName:String(refund.fields.display_name),originalOrderId:data.originalOrder||null,orderId:data.order||null,statusRaw:original['当前状态']||original['交易状态']||'',productRaw:original['商品']||original['商品说明']||''},working.entities);
+  return [new Set(result.candidates)];
+ });
+ const suggested=candidates.filter(row=>suggestions.length&&suggestions.every(ids=>ids.has(row.id)));
+ return {refund,originalId:link?String(link.fields.to_transaction_id):null,candidates,suggested,allocations,currentReduction:link?-Number(snapshot.entities.find(e=>e.type==='consumption_effects'&&e.fields.transaction_id===id)?.fields.amount??0):undefined,expectedSnapshot:relationToken(snapshot)};
 }
 export function planRefundRelation(request:{transactionId:string;originalId:string|null;expectedSnapshot:string;now:string;consumptionReduction?:number},snapshot:LedgerSnapshot):Command[]{
  const context=refundRelationContext(snapshot,request.transactionId);

@@ -3,6 +3,9 @@ import {applyCommands,correctionSnapshot,interpret,pendingPostings} from '../acc
 import type {BusinessCommand,CreateAccount} from '../domain/accounting.ts';
 import type {ImportWorkspaceSnapshot} from '../importing/workspace.ts';
 import {completeImportSessionFromOutcomes} from './import-execution.ts';
+import {resolveAccount} from '../importing/account-resolution.ts';
+import {rememberAccountMappingCommand} from '../importing/resolution-memory.ts';
+import {planImportAccountReevaluation} from './import-account-reevaluation.ts';
 
 export function transferAttentionContext(sessionId:string,attentionId:string,workspace:ImportWorkspaceSnapshot,ledger:LedgerSnapshot){
  const session=workspace.sessions[sessionId],item=workspace.attention[sessionId]?.find(a=>a.id===attentionId);
@@ -36,11 +39,19 @@ export function planImportTransferAnswer(input:ImportTransferAnswer,workspace:Im
  if(input.accountId===context.from.fields.account_id)throw Error('SAME_ACCOUNT_TRANSFER');
  if(context.transaction.fields.status==='PENDING')advance({kind:'BIND_PENDING_ACCOUNT',transactionId:context.transaction.id,movementId:context.to.id,accountId:input.accountId,expectedSnapshot:context.expectedSnapshot});
  else advance({kind:'BIND_ACCOUNT',movementId:context.to.id,accountId:input.accountId});
+ const source=workspace.records[input.sessionId]?.find(r=>r.id===context.item.externalRecordId);
+ if(source?.facts.targetChannelRaw){
+  const request={eventKind:String(context.transaction.fields.event_type),sourceSystem:source.sourceSystem,platform:source.platformRaw,profile:source.profile,channelRaw:source.facts.targetChannelRaw,role:'TARGET' as const,sponsored:false};
+  const resolution=resolveAccount({...request,rememberedAccountId:input.accountId},working.entities,working.conflicts);
+  if(resolution.state!=='RESOLVED'||resolution.accountId!==input.accountId)throw Error('ACCOUNT_UNAVAILABLE');
+  if(resolution.memoryKey){const memory=rememberAccountMappingCommand(working.entities,resolution.memoryKey,{accountId:input.accountId,rememberedAt:input.now});commands.push(memory);working=applyCommands(working,[memory]);}
+ }
  const next=structuredClone(workspace);
  for(const [sessionId,items] of Object.entries(next.attention)){
   const recordIds=new Set((next.outcomes[sessionId]??[]).filter(o=>o.transactionId===context.transaction.id&&o.state==='COMMITTED').map(o=>o.externalRecordId));
   next.attention[sessionId]=items.filter(a=>a.kind!=='TRANSFER_ENDPOINTS'||!recordIds.has(a.externalRecordId));
   if(items.length!==next.attention[sessionId].length)next.sessions[sessionId]=completeImportSessionFromOutcomes(next.sessions[sessionId],next.outcomes[sessionId]??[],next.attention[sessionId],input.now);
  }
- return {commands,workspace:next};
+ const reevaluated=planImportAccountReevaluation(next,working,input.now);
+ return {commands:[...commands,...reevaluated.commands],workspace:reevaluated.workspace};
 }

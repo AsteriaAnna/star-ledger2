@@ -8,6 +8,7 @@ export type NormalizedSourceFacts={
  occurredAt:string|null;
  amountFen:number|null;
  feeFen?:number|null;
+ targetChannelRaw?:string;
  transactionTypeRaw:string;
  directionRaw:string;
  statusRaw:string;
