@@ -24,10 +24,15 @@
 
 ## 2026-10-04 最新体验清理
 
-新地址：[当前清理版](https://asteriaanna.github.io/star-ledger2/preview/m5-20261004-clean/)。固定代码由本轮清理提交及 `preview/m5-clean-20261004` 分支记录，最终源 SHA 见公开 `version.json`。原地址仅为历史检查点，后续讨论以新地址为准。
+新地址：[当前清理版](https://asteriaanna.github.io/star-ledger2/preview/m5-20261004-clean/)。固定源提交 `b4b12bc8deb1b0dc7149d9cd9dbea0a37a4bb7ae`，快照分支 `preview/m5-clean-20261004`，源版本 Verify [37196227399](https://github.com/AsteriaAnna/star-ledger2/actions/runs/37196227399) 成功。原地址仅为历史检查点，后续讨论以新地址为准。
 
 撤下旧兼容队列、集中核对弹窗、旧来源核验窗口和重复入账按钮；账户问题按本批同渠道归组；结果说明压缩，截图确认后一次保存。旧输入只保留自然的“继续填写”入口，来源差异进入现有 SOURCE_UPDATE 路径。不可回答的问题保留未入账状态，撤下只会显示“尚在完善”的假操作窗口，不宣称补问矩阵已完成。
 
 验证：47 文件/368 测试；39 个合成浏览器场景，包括旧来源更正接当前入口、同渠道一次回答、多窗口过期拒绝、截图取消/刷新恢复和持久化失败原子重试。核心/Web 类型和构建通过。本轮截图路径采用已有 OCR 输出合成数据，没有运行真实 OCR 或真机分享。当前发布及公网检查另记在固定发布清单，未通过 M5/M7 全部退出条件。
 
 新预览以独立数据库和缓存发布；不自动带入旧预览数据，需要已有数据时可使用设置中的备份恢复。页面不再增加开发说明横条，版本元数据保留在 meta 和 `version.json`。
+
+
+发布记录：[PR #14](https://github.com/AsteriaAnna/star-ledger2/pull/14) 的 Verify [37196333264](https://github.com/AsteriaAnna/star-ledger2/actions/runs/37196333264) 成功后，合并为 `9cc77b314578371a3eee7b1d4e1f6e69039bacec`。Pages [37196414561](https://github.com/AsteriaAnna/star-ledger2/actions/runs/37196414561) 成功；新地址的公开 version.json 源版本与上述固定提交一致。双目录构建及四项预览隔离/改账/刷新/布局检查通过。主开发 PR #9 仍 Draft。
+
+公网实际浏览器复核：390px 打开新页面，确认无开发横条及旧队列控件；演示账单金额修改为30元刷新仍在；合成三笔同渠道导入只显示一个账户问题，一次回答后刷新没有再次提问；无脚本错误。这里只证明所测公网路径，不扩张为全部任务验收。
