@@ -35,3 +35,5 @@
 
 - 11:59云端文档探测返回 INVALID_CREDENTIALS，817ms；凭据被拒绝，尚未验证数据库存在、集合或权限。12:02配置截图确认普通云函数、Node20.19、未显示执行角色/API Key；用户恢复入口时误填 index.js，已指导恢复 index.main，恢复结果尚待确认。
 - 对照已安装SDK源码：支持环境变量临时密钥及入口 context.extendedContext.tmpSecret；签名依赖已在包内。当前探测未传入 context。新增控制台 credential-probe.main / {"mode":"credential-presence"}，仅返回环境变量和上下文凭据存在与否的布尔值，不返回密钥、Token、上下文、账户信息，不调用网络或数据库。先确认凭据来源，再决定初始化/权限修复，不臆测缺少角色或签发长期密钥。新增测试后401项单元测试通过；云端凭据存在检查尚未执行。
+
+- 12:08凭据存在检查实际通过（3ms）：环境变量 secretId/secretKey/sessionToken 均true，apiKey false；context.extendedContext及其凭据全false。由此排除本次调用缺少三个凭据变量，但不证明凭据有效或执行角色权限足够。只读探测改为在入口调用期间显式传入三项运行时临时凭据，不使用长期密钥、不扩大授权；等待文档读取重测。既有401项单元测试和语法检查通过，不代表云端凭据修复成功。
