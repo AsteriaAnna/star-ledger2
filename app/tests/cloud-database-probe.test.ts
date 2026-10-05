@@ -25,3 +25,11 @@ test('probe recognizes database SDK errCode without exposing errMsg',async()=>{
  const probe=createProbe(()=>{throw {errCode:'DATABASE_REQUEST_FAILED',errMsg:'private password',code:'other'};});
  const result=await probe({mode:'document-readonly'});assert.equal(result.code,'DATABASE_REQUEST_FAILED');assert.equal(JSON.stringify(result).includes('private'),false);
 });
+
+test('credential presence probe reveals only booleans and rejects HTTP requests',async()=>{
+ const {main}=createRequire(import.meta.url)('../cloudbase/functions/star-ledger-register/credential-probe.js');
+ assert.equal((await main({httpMethod:'POST',mode:'credential-presence'},{})).code,'CONSOLE_PROBE_ONLY');
+ const result=await main({mode:'credential-presence'},{extendedContext:{tmpSecret:{secretId:'private-id',secretKey:'private-key',token:'private-token'}}});
+ assert.equal(result.ok,true);assert.deepEqual(result.context,{extendedContext:true,secretId:true,secretKey:true,sessionToken:true});
+ assert.equal(Object.values(result.environment).every(value=>typeof value==='boolean'),true);assert.equal(JSON.stringify(result).includes('private'),false);
+});
