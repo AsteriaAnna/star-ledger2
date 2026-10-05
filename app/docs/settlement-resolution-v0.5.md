@@ -1,5 +1,7 @@
 # v0.5 整笔账冲突解决
 
+> 文档状态：历史设计/时点证据，保留原文。文中的“当前/下一步/已完成”只对应记录当时；最新状态见 [当前状态](project-status.md)，顺序与授权见 [唯一计划](m1-m7-execution-plan.md)，冲突与取消项见 [需求对照](plan-reconciliation.md)。本报告不能单独触发开发或部署。
+
 新增 RESOLVE_SETTLEMENT 业务命令与 settlementConflictIds 查询函数。输入包含 transactionId、目标 SUCCESS/FAILED、成功时的完整 settlement，以及界面所看到的 expectedOperationIds。
 
 处理流程：检查冲突仍与用户所看到的一致，使用既有账务解释器重新校验完整方案，同事务修改状态、整笔账解释及相关余额/消费影响，生成可同步的解决操作。被否定的余额/消费记录金额置零，实体及历史操作仍保留；零额待识别记录不出现在未知账户列表。

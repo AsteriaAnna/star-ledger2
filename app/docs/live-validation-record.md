@@ -1,5 +1,7 @@
 # Windows 与真实 GitHub 联调记录
 
+> 文档状态：历史设计/时点证据，保留原文。文中的“当前/下一步/已完成”只对应记录当时；最新状态见 [当前状态](project-status.md)，顺序与授权见 [唯一计划](m1-m7-execution-plan.md)，冲突与取消项见 [需求对照](plan-reconciliation.md)。本报告不能单独触发开发或部署。
+
 日期：2026-09-28，Asia/Shanghai。版本：v0.4。证据来源为用户在对话中提供的本机 PowerShell 输出，非本执行环境独立重跑。
 
 - Node.js：用户报告 v24.15.0。

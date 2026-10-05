@@ -1,43 +1,54 @@
-# AI 协作约定
+# 星账 AI 协作与接手约定
 
-改动代码前先读这里。目标是：目录可定位、规则单一真相源、改动有测试兜底。
+## 当前授权与必读
 
-## 目录地图
+2026-10-05 用户要求：先全面整理仓库、计划和状态；暂不修改具体功能，取得用户案例并逐项讨论后再开发。本次授权只覆盖文档与说明整理，不自动授权短信开通、云配置/数据修改、注册代码合并、双人实现或安装包发布。
 
-- `app/` —— 单人版源码，**唯一当前维护对象**。
-  - `app/packages/` —— 业务核心（domain / accounting / storage / sync / analytics / platform）。
-  - `app/apps/web/` —— 网页前端（导入、OCR、界面、本地存储）。
-  - `app/tests/`、`app/scripts/` —— 测试与脚本。
-- `legacy-duo/` —— 双人版整包，**只读参考**（页面风格、历史设计）。不要修改、不要构建。
-- `web-dist/` —— 构建产物，由 `npm run build:web` 生成，**不要手改、不要提交**（已 gitignore）。
-- 原始账单数据在仓库外 `../原始账单数据/`，**不要提交**。
+每次接手先读取：
+1. `app/docs/project-status.md`：代码、部署、实测与未知项。
+2. `app/docs/m1-m7-execution-plan.md`：唯一顺序、当前暂停点、输入与退出门槛。
+3. `app/docs/plan-reconciliation.md`：旧要求如何处理，避免遗漏或复活已取消需求。
+4. `app/docs/responsibility-contract.md`：R01–R14 / C01–C06。
+5. 本次具体任务对应的证据文件；文档索引 `app/docs/README.md`。
 
-## 改动边界
+最新用户指令优先；历史报告、旧分支和代码现状不能反向定义用户需求。开始工作前核对远端分支和工作区，保留未提交修改。当前产品代码 `main` 基线6bf4a99，注册产品代码在PR #17 / 2d25e15；文档更新不等于运行代码更新。WIP恢复不直接整包合入。
 
-- 只改 `app/`。
-- 业务规则（金额、余额、消费、退款分配、亲情卡、负债符号）的唯一真相在 `app/packages/accounting/` 与 `app/packages/domain/invariants.ts`；界面只调用、不重新实现。
-- 导入 / 入账核心流程在 `app/apps/web/src/`（importer、account-matcher、refund-matcher、import-workflow、store、channels、categories）。
+## 目录与改动边界
 
-## 验证
+- 产品源码只维护 `app/`；本轮允许更新根README/AGENTS等维护说明，不能借整理修改运行代码。
+- `app/packages/domain` / `accounting`：经济事件、整数分金额、资金与消费、不变量，唯一账务规则来源。
+- `app/packages/application` / `importing`：任务编排、来源与问题、去重和账户记忆。
+- `app/packages/analytics`：余额、消费、范围与下钻，不能另写统计口径。
+- `app/packages/storage` / `sync` / `platform`：持久化、加密、完整批次、恢复与平台边界。
+- `app/apps/web`：页面、捕获适配、IndexedDB；不能把业务规则重新堆回main.ts。
+- `app/cloudbase`：云函数、迁移、权限与说明；配置模板不是云端事实。
+- `legacy-duo/`：只读参考，不修改、不构建、不假定其规则已获确认。
+- `app/web-dist/`：生成产物，不手改、不提交；私人测试文件在仓库外。
+
+## 云端与证据纪律
+
+GitHub只管理源码，CloudBase是唯一目标云服务。当前环境只有PostgreSQL；注册已适配，同步尚未适配。不得按历史说明创建文档集合、安装pg_doc或建立替代环境。
+
+每项进度分别记录：源码已有、限定本地测试、真实云端、真实浏览器、真机和用户验收；不使用无分母完成百分比。未直接复查云端时写明记录日期和来源，不称实时已确认。
+
+云端使用真实会话UID授权，不信任客户端owner；不共享密码。不同登录方式保持同一UID；认证成功不等于密钥解锁。恢复、密码更换、双人授权解密仍有缺口。
+
+不因任务卡住反复要求授权、绕过浏览器凭据保护，或请求聊天明文密钥。需要协助时说明具体页面或只读信息。交接只传公开环境配置与证据，不传邀请码、密码、Token、密钥。
+
+## 开发授权恢复后的检查
+
+每个实现提交引用R/C/M编号，同步更新当前状态与唯一计划；新增或改变需求先记录依据、影响与待确认项。先明确任务和测试案例，不追求无界限审查。
 
 ```sh
 cd app
-npm test                 # 底层账务 / 同步测试（离线）
-npm run typecheck:web    # 类型检查
-npm run build:web        # 构建
+npm test
+npm run typecheck
+npm run typecheck:web
+npm run check:platform
+npm run build:web
+npm run test:web:imports
 ```
 
-- 任何规则改动必须带测试；纯界面改动不得触碰 `app/packages/`。
-- 冲突时不静默采用一端；存在未解决冲突时停止输出合计。
+按改动运行相关检查；文档整理核对链接、需求覆盖和非文档差异，不冒称重跑应用测试。规则改变应有有效回归；不可静默用任一端覆盖冲突。金额用整数分，展示金额不参与余额推导；持久字段snake_case，内存/传输JSON camelCase；错误码英文，用户文案集中映射。
 
-## 命名与规范
-
-- 金额一律整数分（fen）；展示金额不参与余额 / 消费推导。
-- 持久化实体字段用 snake_case（`display_amount`、`occurred_at`）；传输 / 内存 JSON 用 camelCase。
-- 错误标识用英文机器码（如 `STALE_TRANSACTION`），中文文案集中映射到一处。
-- `money()` = 解析字符串为分；校验器不要复用同名。
-
-## 已知边界
-
-- 同步采用手写 CRDT 投影（`app/packages/sync/projection.ts`），每次读取全量重放历史，暂不适合大量交易。
-- 截图 OCR 使用 tesseract.js，首次需联网下载语言包。
+代码已知边界：全历史投影存在规模风险；原生仅有探针；OCR真实截图与手机性能未验收；密码包装密钥/首次写入协议不足以支持验证码登录和密码恢复。详见当前状态，不能把这些缺口当成已解决。
