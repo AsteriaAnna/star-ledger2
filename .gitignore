@@ -9,6 +9,7 @@ web-dist/
 *.db
 *.key
 .env*
+vision-api-results/
 
 # Tauri / 原生
 target/
