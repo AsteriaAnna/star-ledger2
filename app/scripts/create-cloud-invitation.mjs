@@ -1,0 +1,11 @@
+import {randomBytes,createHash} from 'node:crypto';
+import {writeFileSync} from 'node:fs';
+import {resolve,relative,sep} from 'node:path';
+const [username,output]=process.argv.slice(2);
+if(!/^[A-Za-z0-9][A-Za-z0-9_.-]{4,23}$/.test(username||'')||!output)throw Error('Usage: node scripts/create-cloud-invitation.mjs USERNAME OUTPUT_OUTSIDE_REPOSITORY');
+const repository=resolve(import.meta.dirname,'../..'),path=resolve(output),location=relative(repository,path);
+if(!location.startsWith('..'+sep)&&!location.startsWith(sep))throw Error('INVITATION_MUST_BE_OUTSIDE_REPOSITORY');
+const invitation=randomBytes(32).toString('base64url'),expiresAt=new Date(Date.now()+7*86400000).toISOString();
+const envEntry={username,digest:createHash('sha256').update(invitation).digest('hex'),expiresAt};
+writeFileSync(path,JSON.stringify({username,invitation,expiresAt,envEntry},null,2),{flag:'wx',mode:0o600});
+console.log('Invitation saved outside the repository. Never commit it or put the invitation in a URL.');

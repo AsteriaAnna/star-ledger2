@@ -21,7 +21,7 @@
     "build:web": "vite build --config apps/web/vite.config.ts && node scripts/build-web-ocr.mjs && node scripts/build-web-sw.mjs",
     "preview:web": "vite preview --config apps/web/vite.config.ts --host 127.0.0.1",
     "test:web": "node scripts/test-web-ui.cjs",
-    "test:web:imports": "node scripts/test-web-import-v09.cjs",
+    "test:web:imports": "node scripts/test-web-import-v09.cjs && node scripts/test-web-account-onboarding.cjs && node scripts/test-web-cloud-identity.cjs",
     "typecheck:web": "tsc -p apps/web/tsconfig.json --noEmit",
     "test:web:ocr:offline": "node scripts/test-web-ocr-offline.cjs"
   },
