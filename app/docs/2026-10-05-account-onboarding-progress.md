@@ -39,3 +39,44 @@
 - 12:08凭据存在检查实际通过（3ms）：环境变量 secretId/secretKey/sessionToken 均true，apiKey false；context.extendedContext及其凭据全false。由此排除本次调用缺少三个凭据变量，但不证明凭据有效或执行角色权限足够。只读探测改为在入口调用期间显式传入三项运行时临时凭据，不使用长期密钥、不扩大授权；等待文档读取重测。既有401项单元测试和语法检查通过，不代表云端凭据修复成功。
 
 - 12:12显式传入临时凭据后仍 INVALID_CREDENTIALS（1152ms），因此未修复。下一项为同一只读操作的服务端SDK对照：仅探测改用官方云资源调用文档推荐的 @cloudbase/node-sdk@3.18.3（已通过npm元数据确认版本），不修改注册生产入口，不开匿名认证、不扩大权限、不配置长期密钥。待云端对照结果决定存储适配是否需要切换；文档/事务/真实账户仍未验收。
+
+## 2026-10-05 CloudBase MCP 接手：数据库模式已核实，注册数据库修复
+
+范围 R14 / C05 / C06 / M6；读取基线为 feature/account-onboarding 的 b0e9a57，PR #17 保持草稿。先读根/app AGENTS、职责契约、执行计划与本进度，再核对真实云配置。
+
+### 只读诊断
+
+- 上海环境 xingzhang-dev-d0g4a950c6f1204d1 为 NORMAL，PostgreSQL 实例 postgres-45ay1vm6 已存在；Databases=null，RuntimeBackends={postgresql:true,nosql:false,mysql:false}。public 初始没有表，pg_extension 只有 plpgsql。
+- ListTables 明确返回：此环境没有文档数据库实例，已配置 PostgreSQL，文档数据库动作不可用。请求 819f71e3-6303-4dc0-9c16-11ebc46b9b87；star_ledger_registration 文档集合不存在。由此确认 app.database() 的目标实例缺失，而非仅凭 pg_doc 缺失推断。
+- 函数初始入口 database-probe.main；普通 Event / Nodejs20.19 / 256MB / 3秒，实际上海命名空间，角色 TCB_QcsRole，Active。
+- CLS 请求 1d1f322f-ffdd-4dfe-acf1-c2ced892f2e5 确认服务端 SDK 文档读取 RESOURCE_NOT_FOUND，1101ms。旧探针主动舍弃 errMsg，历史日志不能还原原始完整异常正文；上述资源枚举提供可核实的完整根因。此前 js-sdk INVALID_CREDENTIALS 不证明临时凭据缺失，也不证明文档资源存在。
+- 原日志查询工具底层接口已下线，改用 queryLogs 的 CLS 搜索。输出没有密钥、SessionToken、密码或邀请码原文。
+
+### 实现与持久化边界
+
+- 正式入口改用已锁定 @cloudbase/manager-node@5.9.0 的 database.executePGSql，在调用期间显式使用平台注入的短期凭据，固定环境/上海地域；不配置长期密钥或 API Key。
+- 迁移 20261005051200_registration_claims 与 20261005052500_registration_claim_privileges 均经异步任务 Succeed、远端迁移历史及 schema 复查确认已应用。
+- public.star_ledger_registration 以邀请摘要为主键，用户名和 UID 唯一，额外 lower(username) 唯一索引匹配云认证用户名归一化。claimed_at 使用数据库时钟；密码/邀请码原文不入库。
+- 固定 INSERT ... ON CONFLICT DO NOTHING 是一条原子数据库事务，唯一索引处理跨请求/跨实例竞争。只接受服务端明确 AffectedRows=1 才创建用户，0 为已占用；缺失/异常结果或网络失败均关闭注册，不释放邀请。创建用户结果不确定仍不释放、不重置密码。
+- 实测 ExecutePGSql 对 INSERT 即使带 RETURNING 仍返回 Columns/Rows=null，AffectedRows 为0/1；已据此修正适配层并增加本地回归。不得把中间探针报错写成最终通过。
+- RLS 开启且 FORCE，anon/authenticated 没有表权限或放行策略；service_role 仅 SELECT/INSERT。平台建表默认曾授 service_role 全权限，已撤销其 UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER，并用后续迁移固定最小表权限。未改变全局鉴权或开启匿名登录。
+- 没有安装 pg_doc、创建替代环境、扩展到同步数据库或改变前端页面。
+
+### 云端验收（不等于页面全部完成）
+
+| 验收项 | 实际结果 | 证据 |
+| --- | --- | --- |
+| 函数身份连接 PostgreSQL | 成功，读取真实注册表 | 92a84457-5647-4540-ad3c-580f27d7337b，208ms |
+| 并发邀请原子占用 | 成功，两个并发请求只有一个成功、只有一条记录 | 0850b1c9-5781-4412-9158-a5783501839f，216ms |
+| 故意异常回滚 | 成功，嵌套事务插入被回滚、复查无记录 | 4b0b6a68-1c83-4b96-a84a-cc04cd5d08fc，65ms |
+| 无邀请码配置 | 503 / REGISTRATION_CLOSED | 7e4ca7a1-3ffd-4c2a-b958-97dbb81ad1b7，7ms |
+| 错误邀请码 | 400 / INVITATION_INVALID，没有创建账号 | 64cd2db8-6bbb-4dfa-a52a-6e82fbd7a9cc，4ms |
+| 真实受邀注册（正式函数直接调用） | 成功，201；auth.users 中确有对应 sub、external 普通账号和激活状态，邀请记录1条 | 8c008457-9dc5-4ddb-b87b-7674cd56a29d，947ms |
+| 重复注册 | 400 / INVITATION_USED，没有重复账号 | 37410a33-dfe5-4b54-82fe-f23e84e834cf，78ms |
+| 真实密码登录、邀请表访问隔离 | 成功，登录返回正确UID；真实用户读取邀请表403 | 831b09e3-8d8d-41e4-8cf3-6e8729b059f6，901ms |
+| HTTP注册路由 / 浏览器真实流程 | 未验收；云端目前没有 /api/account/register 路由，未部署本PR网页 | 只读网关路由核对 |
+| 双设备同步 / 恢复 | 未验收 | 后续门槛保持 |
+
+随机24位用户名、随机密码和邀请码仅存本机仓库外文件，NTFS ACL仅当前用户；云配置只有摘要、指定用户名和到期时间。用户已明确授权生成随机密码并自动验收。保留真实新账号与其已占用邀请记录；探针临时记录已删除，回滚探针不留数据。
+
+正式 Handler 必须最后复查为 index.main / Active。更新配置工具对 handler 字段没有实际效果；需 updateFunctionCode 顶层 handler，并等待 Active 后再运行，Updating 期间可能执行旧代码。本地三项新增存储适配测试通过；完整测试、类型检查及生产构建由 PR Verify 验证，不沿用此前401测试作为本轮证据。
