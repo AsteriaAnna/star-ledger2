@@ -20,4 +20,4 @@ function createProbe(getDatabase){
  };
 }
 exports.createProbe=createProbe;
-exports.main=createProbe(()=>require('@cloudbase/js-sdk').init({env:'xingzhang-dev-d0g4a950c6f1204d1',region:'ap-shanghai',secretId:process.env.TENCENTCLOUD_SECRETID,secretKey:process.env.TENCENTCLOUD_SECRETKEY,sessionToken:process.env.TENCENTCLOUD_SESSIONTOKEN,timeout:1800}).database());
+exports.main=createProbe(()=>require('@cloudbase/node-sdk').init({env:'xingzhang-dev-d0g4a950c6f1204d1',region:'ap-shanghai',secretId:process.env.TENCENTCLOUD_SECRETID,secretKey:process.env.TENCENTCLOUD_SECRETKEY,sessionToken:process.env.TENCENTCLOUD_SESSIONTOKEN,timeout:1800}).database());
