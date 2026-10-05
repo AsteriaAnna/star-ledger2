@@ -20,3 +20,8 @@ test('probe failures expose bounded diagnostic codes without exception descripti
   const result=await probe({mode:'document-readonly'});assert.equal(result.ok,false);assert.equal(result.code,expected);assert.equal(JSON.stringify(result).includes('private'),false);
  }
 });
+
+test('probe recognizes database SDK errCode without exposing errMsg',async()=>{
+ const probe=createProbe(()=>{throw {errCode:'DATABASE_REQUEST_FAILED',errMsg:'private password',code:'other'};});
+ const result=await probe({mode:'document-readonly'});assert.equal(result.code,'DATABASE_REQUEST_FAILED');assert.equal(JSON.stringify(result).includes('private'),false);
+});

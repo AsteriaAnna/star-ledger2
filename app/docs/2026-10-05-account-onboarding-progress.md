@@ -30,3 +30,5 @@
 - 每阶段单独调用，SDK 网络超时1800ms；云函数3秒总限制仍可能使事务阶段超时，此时不能推断文档数据库不存在。
 - 操作：在现有注册函数添加 database-probe.js 并部署；临时将执行方法改为 database-probe.main；先测试 {"mode":"document-readonly"}，再测试 {"mode":"transaction-readonly"}；无论结果如何都恢复 index.main。不要开通探测HTTP路由。
 - 本轮399项单元测试全部通过（含新增三项探测测试）；探测测试覆盖入口守卫、固定只读操作、不返回文档和异常机密。云端探测尚未运行；真实注册/同步继续待验收。
+
+- 11:51用户截图：document-readonly 已实际执行，ok:false / PROBE_FAILED / elapsedMs1197，函数1204ms。该结果不证明数据库不存在。检查已安装数据库SDK源码发现错误使用 errCode/errMsg，原探测只读取 code，遗漏具体错误码；修正为优先 errCode、保留受限大写机器码，仍不返回 errMsg。新增对应回归测试，本轮400项测试通过；等待更新后云端重测。

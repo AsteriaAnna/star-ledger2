@@ -1,9 +1,9 @@
 // Console-only diagnostic for R14/C05/C06/M6. No writes and no returned records.
 const knownCodes=new Set(['DATABASE_COLLECTION_NOT_EXIST','COLLECTION_NOT_EXIST','DATABASE_NOT_EXIST','ENV_NOT_EXIST','INVALID_ENV','PERMISSION_DENIED','AUTH_FAILED','INVALID_PARAM','TIMEOUT','NETWORK_ERROR']);
 function safeCode(error){
- const value=error?.code;
+ const value=error?.errCode??error?.code;
  if(typeof value==='number'&&Number.isSafeInteger(value))return value;
- if(typeof value==='string'&&(knownCodes.has(value)||/^-?\d{1,9}$/.test(value)))return value;
+ if(typeof value==='string'&&(knownCodes.has(value)||/^[A-Z][A-Z0-9_]{1,63}$/.test(value)||/^-?\d{1,9}$/.test(value)))return value;
  return 'PROBE_FAILED';
 }
 function createProbe(getDatabase){
