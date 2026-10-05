@@ -1,5 +1,7 @@
 # 受邀注册部署与操作
 
+> 2026-10-05 当前状态：本页说明feature/account-onboarding产品代码2d25e15，main尚无注册代码。服务端注册已实测，HTTP/浏览器未验收；当前用户要求暂停功能开发与部署。先读 [状态](../docs/project-status.md) 与 [唯一计划](../docs/m1-m7-execution-plan.md)，下列操作只能在该单元重新获授权后执行。
+
 R14 / C05 / C06 / M6。默认拒绝所有注册；没有 STAR_LEDGER_INVITES_JSON 或格式错误时不会创建用户。不得把邀请码、密码、运行身份凭据提交 Git 或写入日志。
 
 1. 环境 xingzhang-dev-d0g4a950c6f1204d1（ap-shanghai）实际为 PostgreSQL，没有文档数据库。通过版本化迁移应用 cloudbase/migrations 中两份 registration_claim* SQL，复查任务终态、远端历史和表结构。不要创建文档集合或安装 pg_doc。

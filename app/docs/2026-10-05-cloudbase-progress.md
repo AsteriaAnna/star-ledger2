@@ -1,5 +1,7 @@
 # 个人版 CloudBase 接入进度（2026-10-05）
 
+> 文档状态：历史设计/时点证据，保留原文。文中的“当前/下一步/已完成”只对应记录当时；最新状态见 [当前状态](project-status.md)，顺序与授权见 [唯一计划](m1-m7-execution-plan.md)，冲突与取消项见 [需求对照](plan-reconciliation.md)。本报告不能单独触发开发或部署。
+
 对应 R14、C04/C06、M6.1/M6.2；执行清单 P12/P13/P14。环境 xingzhang-dev-d0g4a950c6f1204d1 / ap-shanghai。
 
 ## 已实现，可核查的内容

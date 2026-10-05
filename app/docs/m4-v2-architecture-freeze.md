@@ -1,5 +1,7 @@
 # 星账 V2 · M4 应用架构与状态模型冻结报告
 
+> 文档状态：历史设计/时点证据，保留原文。文中的“当前/下一步/已完成”只对应记录当时；最新状态见 [当前状态](project-status.md)，顺序与授权见 [唯一计划](m1-m7-execution-plan.md)，冲突与取消项见 [需求对照](plan-reconciliation.md)。本报告不能单独触发开发或部署。
+
 > **当前执行入口（2026-10-03 更新）**：[M1–M7 职责驱动计划](m1-m7-execution-plan.md) 与 [职责契约](responsibility-contract.md)。本文件保留历史设计/时点记录；后续顺序、实际状态及本轮明确修订以当前执行入口为准。
 
 > 分支：`m4-v2-architecture`  
