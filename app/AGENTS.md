@@ -2,7 +2,7 @@
 
 继承根目录AGENTS.md。产品源码只维护本目录，legacy-duo只读参考。
 
-本轮只整理文档，暂不修改功能、不部署；后续先与用户讨论具体目标并取得对应测试案例。开始时依次读：
+23:54用户已授权按docs/2026-10-05-ai-capture-development-plan.md先开发AI截图公共基础再接页面；K01当前仅模块验证，真实云和页面按后续单元推进。开始时依次读：
 1. `docs/project-status.md`
 2. `docs/m1-m7-execution-plan.md`
 3. `docs/plan-reconciliation.md`
