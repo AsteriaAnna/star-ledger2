@@ -21,7 +21,7 @@
 - 新增6项定向验证，加已有响应/远端契约，共27项通过：正常持久结果、重复不再调模型、取消迟到、损坏结果、Web原子入账、缺事实补充、并发账本变化拒绝。
 - 核心测试466/466、核心与Web类型检查、平台边界、Web构建、函数公共代码构建通过。
 - 服务端测试使用注入的身份/仓库/模型响应；不是新一轮真实PG或模型调用。既有真实PG验收保持通过，不重做。
-- 本地Chromium已取得，但当前执行环境禁止其创建socket，无法启动。已新增390px真实浏览器操作脚本，接入既有test:web:imports/Verify流程；身份、PG与模型传输使用合成替身，不发真实图片或付费调用。CI结果待回收，不能用本地类型检查替代页面/真机结果。
+- 本地Chromium已取得，但当前执行环境禁止其创建socket，无法启动。已新增390px真实浏览器操作脚本，接入既有test:web:imports/Verify流程；身份、PG与模型传输使用合成替身，不发真实图片或付费调用。远端复查该分支工作流数量为0，CI尚未启动，不能用本地类型检查替代页面/真机结果。
 - **未部署、没有实际模型调用、未做真实手机验收，S1尚未交付完成。** 未改注册、账本同步、认证配置或正式旧Handler。
 
 ## 交给已有云连接的本机Codex执行
@@ -61,3 +61,11 @@ tcb fn deploy star-ledger-capture --config-file capture.cloudbaserc.json
 ## 下一停止点
 
 当前会话无CloudBase工具、无正式Key，无法替代本机云连接完成部署。下一项为上述部署、真实浏览器和手机单图验收，不再做模型选型或重复PG验收；S1可用之后进入S2。遇到配置缺失只请求具体一项帮助；不要求重新登录全部服务。
+
+## 可直接交给本机Codex的执行指令
+
+本次代码在[草稿PR #18](https://github.com/AsteriaAnna/star-ledger2/pull/18)，最新运行代码提交`5cbd47ddfcab7eb828f4766f834abcf0ac332c0e`。以下是部署交接，不是再次建立开发计划：
+
+> 请保留本机未提交工作，拉取星账`feature/capture-foundation-20261005`最新代码，先读本文件。当前任务仅S1单图网页交付。使用你已有的CloudBase连接，按本文件步骤构建并部署新增`star-ledger-capture`函数和网页到现有上海环境，不合并PR、不动注册/同步函数、不重做PG验收。先执行`npm run test:web:capture`（缺浏览器时先`npx playwright install chromium`），或从GitHub Actions的Verify手动选择此分支运行；浏览器脚本失败只修复当前使用路径。正式Key和测试UID仅在本机安全配置，缺其中一项时明确询问，勿输出凭据。保留静态托管`__auth/`和`cloud-admin/`及回退版本。部署后用原账号从真实页面验收一张普通付款截图、分类修改、刷新、重导和取消；只做必要定向模型调用，不重跑15图。返回部署提交、实际函数Handler/超时、浏览器结果、真实操作结果和可访问链接；未通过项明确列出，不用测试数量代替交付。
+
+GitHub Verify入口：https://github.com/AsteriaAnna/star-ledger2/actions/workflows/verify.yml 。本会话没有工作流启动接口；未启动原因尚未确认，不推断为代码通过或失败。先补实际页面验证和部署，S1用户验收通过后才推进S2多图。
