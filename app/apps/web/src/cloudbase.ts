@@ -6,7 +6,7 @@ export function localCloudIdentity():CloudIdentity|null{
  const value=localStorage.getItem(identityKey);if(!value)return null;
  try{const v=JSON.parse(value);return typeof v.uid==='string'&&v.uid&&typeof v.username==='string'?v:null;}catch{return null;}
 }
-async function createClient(){const {default:cloudbase}=await import('@cloudbase/js-sdk');return cloudbase.init({...cloudbaseConfig,persistence:'local'});}
+async function createClient(){const {default:cloudbase}=await import('@cloudbase/js-sdk');return cloudbase.init({...cloudbaseConfig,persistence:'local',timeout:60000});}
 let instance:ReturnType<typeof createClient>|undefined;
 export async function cloudbaseClient(){
  if(!instance)instance=createClient();

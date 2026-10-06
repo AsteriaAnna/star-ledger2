@@ -5,3 +5,4 @@ web-dist/
 *.key
 .env*
 target/
+cloudbase/functions/star-ledger-capture/shared.cjs

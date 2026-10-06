@@ -1,6 +1,6 @@
 # 星账 · 当前开发入口
 
-先读 [当前状态](docs/project-status.md)、[唯一计划](docs/m1-m7-execution-plan.md)、[需求对照](docs/plan-reconciliation.md) 和 [职责契约](docs/responsibility-contract.md)。当前仅文档整理，功能开发等待用户逐项讨论与案例。
+先读 [当前状态](docs/project-status.md)、[唯一计划](docs/m1-m7-execution-plan.md)、[需求对照](docs/plan-reconciliation.md) 和 [职责契约](docs/responsibility-contract.md)。S1源码已有，当前下一项是实际部署与手机验收，详见[单图真实网页闭环S1](docs/2026-10-06-usable-capture-delivery-plan.md)，必要云服务与页面一起交付并由用户验收。
 
 ## 代码与产品范围
 

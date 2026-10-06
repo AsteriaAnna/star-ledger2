@@ -1,0 +1,1 @@
+{"envId":"xingzhang-dev-d0g4a950c6f1204d1","functionRoot":"./functions","functions":[{"name":"star-ledger-capture","runtime":"Nodejs20.19","handler":"index.main","timeout":60,"memorySize":256,"installDependency":true}]}

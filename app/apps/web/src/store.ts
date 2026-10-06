@@ -1,3 +1,6 @@
+import type {CaptureJob} from './capture-jobs.ts';
+import {readPersistedCaptureEvidence} from '../../../packages/importing/persisted-capture-evidence.ts';
+import {validateCaptureReferences,mergeCaptureEvidence} from '../../../packages/importing/capture-evidence.ts';
 import {ledgerSettings,planLedgerSettings,planLegacyLedgerSettings} from '../../../packages/application/ledger-settings.ts';
 import type {Operation,Entity,EntityType,Batch,Conflict,FieldVersion} from '../../../packages/domain/index.ts';
 import type {SyncStore} from '../../../packages/platform/ports.ts';
@@ -24,6 +27,9 @@ export function validateImportWorkspace(value:unknown):ImportWorkspaceSnapshot{
  for(const [id,items] of Object.entries(outcomes) as [string,any[]][]){if(!ids.has(id)||!Array.isArray(items)||items.some(o=>!o||o.sessionId!==id||typeof o.externalRecordId!=='string'||!['COMMITTED','SKIPPED_DUPLICATE','NO_EFFECT','BLOCKED'].includes(o.state)))throw Error('备份导入恢复状态格式无效');}
  const interpretations=v.interpretations??{};if(!interpretations||typeof interpretations!=='object'||Array.isArray(interpretations))throw Error('备份解释格式无效');
  for(const [id,items] of Object.entries(interpretations) as [string,any[]][]){const recordIds=new Set((v.records[id]??[]).map((r:any)=>r.id));if(!ids.has(id)||!Array.isArray(items)||new Set(items.map(i=>i?.externalRecordId)).size!==items.length||items.some(i=>!i||!recordIds.has(i.externalRecordId)||typeof i.eventKind!=='string'||!['SUCCESS','PENDING','FAILED','UNKNOWN'].includes(i.status)||(i.amountFen!==null&&!Number.isSafeInteger(i.amountFen))||(i.occurredAt!==null&&typeof i.occurredAt!=='string')||typeof i.displayName!=='string'||!Array.isArray(i.evidence)))throw Error('备份解释格式无效');}
+ const captures=v.captureEvidence??{};if(!captures||typeof captures!=='object'||Array.isArray(captures))throw Error('INVALID_CAPTURE_BACKUP');
+ for(const [id,evidence] of Object.entries(captures)){if(!ids.has(id)||!Array.isArray(evidence))throw Error('INVALID_CAPTURE_BACKUP');validateCaptureReferences(v.records[id]??[],evidence);}
+ for(const [id,records] of Object.entries(v.records))validateCaptureReferences(records as any[],captures[id]??[]);
  return structuredClone({...v,outcomes,...(v.interpretations?{interpretations}:{})}) as ImportWorkspaceSnapshot;
 }
 function mergeImportWorkspace(current:ImportWorkspaceSnapshot|undefined,incoming:ImportWorkspaceSnapshot){
@@ -31,19 +37,20 @@ function mergeImportWorkspace(current:ImportWorkspaceSnapshot|undefined,incoming
  for(const [id,session] of Object.entries(incoming.sessions)){
   const existing=out.sessions[id];if(existing&&existing.updatedAt>=session.updatedAt)continue;
   out.interpretations??={};out.interpretations[id]=structuredClone(incoming.interpretations?.[id]??[]);
+  if(incoming.captureEvidence?.[id]){out.captureEvidence??={};out.captureEvidence[id]=mergeCaptureEvidence(out.captureEvidence[id]??[],incoming.captureEvidence[id]);}
   out.sessions[id]=structuredClone(session);out.records[id]=structuredClone(incoming.records[id]??[]);out.attention[id]=structuredClone(incoming.attention[id]??[]);out.outcomes[id]=structuredClone(incoming.outcomes?.[id]??[]);
  }
  return out;
 }
-export type State={cloud?:{uid:string;ledger:string;recoveryKey:string};version:2;imports?:Draft[];importRevision?:number;importWorkspace?:ImportWorkspaceSnapshot;revision:number;device:string;ops:Operation[];pending:string[];batches:{device:string;seq:number;checksum:string}[];envelopes:Record<string,string>;settings:Record<string,any>};
+export type State={captureJobs?:Record<string,CaptureJob>;cloud?:{uid:string;ledger:string;recoveryKey:string};version:2;imports?:Draft[];importRevision?:number;importWorkspace?:ImportWorkspaceSnapshot;revision:number;device:string;ops:Operation[];pending:string[];batches:{device:string;seq:number;checksum:string}[];envelopes:Record<string,string>;settings:Record<string,any>};
 export const fresh=():State=>({version:2,imports:[],importRevision:0,importWorkspace:{sessions:{},records:{},attention:{},outcomes:{}},revision:0,device:crypto.randomUUID(),ops:[],pending:[],batches:[],envelopes:{},settings:{budget:300000,categories:['餐饮','购物','交通','生活','娱乐','学习','医疗','其他'],mode:'auto'}});
 export class MemoryStore implements SyncStore {
  state:State;entities:Entity[];conflicts:Conflict[];
- constructor(state:State){this.state=structuredClone(state);const p=project(state.ops);this.entities=p.entities;this.conflicts=p.conflicts;this.state.settings=ledgerSettings(p,this.state.settings);}
+ constructor(state:State){this.state=structuredClone(state);const p=project(state.ops);readPersistedCaptureEvidence(p.entities);this.entities=p.entities;this.conflicts=p.conflicts;this.state.settings=ledgerSettings(p,this.state.settings);}
  atomic<T>(fn:()=>T):T{const s=structuredClone(this.state),e=this.entities,c=this.conflicts;try{return fn();}catch(err){this.state=s;this.entities=e;this.conflicts=c;throw err;}}
  allOperations(){return structuredClone(this.state.ops);}
  append(op:Operation,local:boolean){this.state.ops.push(structuredClone(op));if(local)this.state.pending.push(op.id);}
- project(entities:Entity[],conflicts:Conflict[],_v:FieldVersion[]){this.entities=entities;this.conflicts=conflicts;this.state.settings=ledgerSettings({entities,conflicts},this.state.settings);}
+ project(entities:Entity[],conflicts:Conflict[],_v:FieldVersion[]){readPersistedCaptureEvidence(entities);this.entities=entities;this.conflicts=conflicts;this.state.settings=ledgerSettings({entities,conflicts},this.state.settings);}
  get(type:EntityType,id:string){return this.entities.find(e=>e.type===type&&e.id===id);}
  pendingOperations(){const ids=new Set(this.state.pending);return this.state.ops.filter(o=>ids.has(o.id));}
  acknowledgeOperations(ids:string[]){const set=new Set(ids);this.state.pending=this.state.pending.filter(id=>!set.has(id));}
@@ -54,6 +61,7 @@ export class MemoryStore implements SyncStore {
  acknowledgedEnvelopes(){return Object.entries(this.state.envelopes).filter(([id])=>!this.state.ops.some(o=>o.command_id===id&&this.state.pending.includes(o.id))).map(([,e])=>e);}
 }
 let db:IDBDatabase;let queue=Promise.resolve();let activeLedgerKey='main';
+export function assertLocalLedgerOwner(uid:string){if(activeLedgerKey!==ownerKey(uid))throw Error('CLOUD_OWNER_MISMATCH');}
 const ownerKey=(owner:string|null)=>owner?'cloudbase:'+encodeURIComponent(owner):'main';
 export async function openStore(owner:string|null=null){activeLedgerKey=ownerKey(owner);db=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open('star-ledger-next-v1',2);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('ledger'))r.result.createObjectStore('ledger');};r.onblocked=()=>reject(Error('请关闭其他星账页面，再重新打开以完成升级'));r.onsuccess=()=>{r.result.onversionchange=()=>r.result.close();resolve(r.result);};r.onerror=()=>reject(r.error);});const current=await read();if(!current)await write(fresh(),-1);else if(Number(current.version)<2)await write({...current,version:2,imports:[],importRevision:0},current.revision);else if(current.version!==2)throw Error('不支持此数据版本，请更新星账');}
 export async function read():Promise<State>{return new Promise((resolve,reject)=>{const r=db.transaction('ledger').objectStore('ledger').get(activeLedgerKey);r.onsuccess=()=>{try{const state=r.result;if(state)state.settings=ledgerSettings(project(state.ops),state.settings);resolve(state);}catch(e){reject(e);}};r.onerror=()=>reject(r.error);});}

@@ -1,0 +1,3 @@
+import type {CaptureTask,CaptureReceipt} from '../../../packages/application/capture-task.ts';
+import type {CaptureEvidence,EventInterpretation} from '../../../packages/importing/types.ts';
+export type CaptureJob={id:string;uid:string;ledgerId:string;contentHash:string;sourceSystem:'WECHAT'|'ALIPAY';mime:string;image?:Blob;createdAt:number;expiresAt:number;state:'QUEUED'|'WAITING'|'NEEDS_INPUT'|'FAILED'|'COMPLETED'|'CANCELLED';error?:string;remote?:CaptureTask;evidence?:CaptureEvidence;receipt?:CaptureReceipt;summary?:{created:number;duplicate:number;noEffect:number};sessionId?:string;transactionIds?:string[];answers?:Record<string,Partial<Pick<EventInterpretation,'amountFen'|'occurredAt'|'status'|'eventKind'>>>};

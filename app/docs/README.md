@@ -4,11 +4,29 @@
 
 最新用户明确修订优先；本文四个当前入口互相分工，只有执行计划决定顺序。发生新决策先更新这些入口，再写有日期的证据，不再向多份旧计划不断追加“当前下一项”。
 
+## 当前开发与交接
+
+- [S1单图实现与部署交接](2026-10-06-s1-capture-web-implementation.md)：页面/正式函数/共同导入入口已接，构建就绪；尚未部署与真实手机验收。
+
+## 当前开发准备
+
+- [可用流程优先：开发准备与阶段验收](2026-10-06-usable-capture-delivery-plan.md)：S1单图真实网页闭环为下一项，S2–S8与后续大阶段、文件定位、用户验收及部署协作；细化唯一计划。
+
 ## 当前需求讨论
 
 - [需求与开发安排讨论稿 v1.3](2026-10-05-requirements-discussion.md)：目前进行到“导入与截图”案例讨论，日期与统计已有初步方向。此文保留候选任务和待决边界，不作为另一份执行计划。
 
 ## 当前重要证据
+
+- [K05a最终PG整改复测](2026-10-06-capture-pg-retest-accepted.md)：真实功能9/9、有效权限48/48；PG子项通过，截图阶段仍部分通过。
+
+- [K05a真实PG部分验收与整改](2026-10-06-capture-pg-real-acceptance-and-fixes.md)：真实API返回值和默认ACL修复，历史整改，最终复测已通过。
+
+- [CloudBase识别任务/结果基础](2026-10-06-capture-postgres-foundation.md)：源码与真实PG验收指令；当前会话云连接缺失。
+
+- [AI响应→公共导入集成](2026-10-06-capture-response-import-integration.md)：冻结响应回放、分类/任务/原子结果边界；下一项真实识别服务。
+
+- [AI截图基础计划](2026-10-05-ai-capture-development-plan.md)：阶段与验收；[多事件来源](2026-10-06-capture-multi-event-foundation.md)、[正式证据保存与恢复](2026-10-06-capture-ledger-evidence-persistence.md)、[退款跨来源匹配](2026-10-06-refund-cross-source-matching.md)、[删除态与显式恢复](2026-10-06-import-deletion-and-explicit-restore.md)为限定本地实施记录。
 
 - [真实文件导入修复](2026-10-05-import-fixes-progress.md)：169+169样本结果与未完成资金端。
 - [改账](m5-2-editing-progress.md)、[退款](m5-3-refund-progress.md)、[来源恢复](m5-1-source-review-progress.md)：限定验收，不等于完整任务通过。
