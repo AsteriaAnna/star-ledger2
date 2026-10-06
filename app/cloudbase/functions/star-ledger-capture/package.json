@@ -1,0 +1,1 @@
+{"name":"star-ledger-capture","private":true,"version":"0.1.0","main":"index.cjs","dependencies":{"@cloudbase/node-sdk":"3.18.3","@cloudbase/manager-node":"5.9.0"}}

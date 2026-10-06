@@ -1,20 +1,11 @@
-# 识别服务存储适配（K05a，未部署）
+# 单图识别服务（S1，待部署验收）
 
-当前只有服务端SQL适配 `postgres.cjs`，没有正式 `index.main`、SDK初始化、图片上传接口或TokenHub调用。不可将此目录直接部署成可用识别函数。
+已补index.main运行入口、可信UID/试用名单、私密请求图片、TokenHub官方API及PG任务/完整证据保存。先在app执行npm run build:capture生成shared.cjs，再部署整个本目录；直接上传未构建源码缺少依赖。SDK依赖使用package-lock锁定。
 
-与 `packages/application/remote-capture.ts` 配合：调用方从经验证的运行时身份取得UID；用户请求体不能提供UID/owner。SQL执行函数应由CloudBase Manager SDK的executePGSql注入，使用函数调用期间凭据，不从网页取得管理员密钥。运行查询固定Role=service_role；迁移另用管理角色。
+部署、Key/名单、超时、网页发布与真实手机验收见[交接](../../../docs/2026-10-06-s1-capture-web-implementation.md)。当前没有部署/实际模型调用，不能宣称服务可用；PG原子性/返回值/权限保持既有验收边界。
 
-执行 `cloudbase/migrations/003-capture-task-and-result.sql` 前先实时检查上海环境、数据库、现有表及service_role属性。它是单条DO块，适配ExecutePGSql单语句限制，不按分号拆开。建两张隔离表，不修改注册或同步表。客户端角色无权限；结果表仅SELECT/INSERT，应用不改写原始提取。
+运行SQL固定service_role，UID从CloudBase运行时获取，不接受客户端owner/ledgerId。只允许CAPTURE_ALLOWED_UIDS中的现有测试身份，缺配置默认拒绝。TokenHub Key只存服务端。图片最大4MB，仅请求/内存临时传输，没有公开图片URL或云图库。当前一次函数调用内完成识别，租约到期可显式重试，不是独立持久worker调度。
 
-READY状态必须与完整CaptureEvidence一次SQL提交。普通replace保持结果引用不变；新结果只能publish。发布前公共服务检查租约/attempt/到期、内容指纹与提取证据哈希；版本CAS拒绝迟到响应。任务、图片指纹与请求版本不可因重试改成另一个输入。
+普通DML以AffectedRows判成功，空SELECT的Rows:null归一为空。003/004已在用户转交的真实PG报告中验收，不因S1重复迁移。全局默认ACL仍有历史过宽风险，未来新表须显式REVOKE后最小GRANT与有效权限审计。
 
-该仓库故意不实现客户端账本提交：云结果保存与本机账务提交属于不同数据库，不能承诺同一事务。完成本机账务使用已有capture-import流程；后续可靠领取/回执协议单独落实。
-
-2026-10-06 20:43用户转交真实PG并发、权限/回滚复测通过，见docs/2026-10-06-capture-pg-retest-accepted.md。仓库本地测试仍属于服务与SQL契约替身，不应与该云端报告混称。
-
-## 2026-10-06真实验收修正
-
-真实API对普通DML仅提供AffectedRows，不提供RETURNING行；create/replace使用0/1计数。SELECT有payload列而Rows:null是空结果。003后必须再应用004-capture-service-role-privileges.sql，避免建表默认ACL遗留service_role全权限；有效权限用capture-privilege-audit.sql复读。真实整改复测最终功能9/9、有效权限48/48通过；源码与部署边界仍见docs/2026-10-06-capture-pg-retest-accepted.md。
-
-
-全局建表默认ACL仍会授予三角色额外权限。未来迁移新表必须先显式REVOKE旧授权再GRANT最小权限，并审计有效权限；本轮只修两张识别表，没有修改全局默认ACL。PG子项通过不等于可部署整个识别函数，20:43报告当轮未推进真实图片调用。晚间用户修订下一项为S1实际服务与页面闭环，见docs/2026-10-06-usable-capture-delivery-plan.md；此目录仍未成为可部署完整函数。
+云结果与本机账本不跨库事务；Web原子保存正式账务/来源/导入结果/本机回执，云端仍保存READY结果供幂等重取。取消/版本竞争拒绝迟到发布。注册、同步和既有正式函数不在本目录部署范围。

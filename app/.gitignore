@@ -1,0 +1,8 @@
+node_modules/
+web-dist/
+*.sqlite*
+*.db
+*.key
+.env*
+target/
+cloudbase/functions/star-ledger-capture/shared.cjs

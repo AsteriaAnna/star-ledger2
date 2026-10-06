@@ -2,7 +2,7 @@
 
 继承根目录AGENTS.md。产品源码只维护本目录，legacy-duo只读参考。
 
-2026-10-06晚间最新修订：下一项S1单图真实网页闭环，必要云服务与页面一起做，先实际可用再推进；详见docs/2026-10-06-usable-capture-delivery-plan.md。本轮只更新文档。旧K顺序与停止点只作追溯。
+2026-10-06晚间最新修订：下一项S1单图真实网页闭环，必要云服务与页面一起做，先实际可用再推进；详见docs/2026-10-06-usable-capture-delivery-plan.md。S1源码接通，待部署和真实网页/手机验收；见docs/2026-10-06-s1-capture-web-implementation.md。旧K顺序与停止点只作追溯。
 
 23:54用户已授权按docs/2026-10-05-ai-capture-development-plan.md先开发AI截图公共基础再接页面；K01当前仅模块验证，真实云和页面按后续单元推进。开始时依次读：
 1. `docs/project-status.md`
