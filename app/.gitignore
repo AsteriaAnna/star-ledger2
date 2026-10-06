@@ -1,7 +1,0 @@
-node_modules/
-web-dist/
-*.sqlite*
-*.db
-*.key
-.env*
-target/

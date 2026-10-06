@@ -17,4 +17,4 @@ READY状态必须与完整CaptureEvidence一次SQL提交。普通replace保持�
 真实API对普通DML仅提供AffectedRows，不提供RETURNING行；create/replace使用0/1计数。SELECT有payload列而Rows:null是空结果。003后必须再应用004-capture-service-role-privileges.sql，避免建表默认ACL遗留service_role全权限；有效权限用capture-privilege-audit.sql复读。真实整改复测最终功能9/9、有效权限48/48通过；源码与部署边界仍见docs/2026-10-06-capture-pg-retest-accepted.md。
 
 
-全局建表默认ACL仍会授予三角色额外权限。未来迁移新表必须先显式REVOKE旧授权再GRANT最小权限，并审计有效权限；本轮只修两张识别表，没有修改全局默认ACL。PG子项通过不等于可部署整个识别函数，保持不推进真实图片调用。
+全局建表默认ACL仍会授予三角色额外权限。未来迁移新表必须先显式REVOKE旧授权再GRANT最小权限，并审计有效权限；本轮只修两张识别表，没有修改全局默认ACL。PG子项通过不等于可部署整个识别函数，20:43报告当轮未推进真实图片调用。晚间用户修订下一项为S1实际服务与页面闭环，见docs/2026-10-06-usable-capture-delivery-plan.md；此目录仍未成为可部署完整函数。
