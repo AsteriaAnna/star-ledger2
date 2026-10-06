@@ -6,7 +6,7 @@
 
 ## 2026-10-06执行收口
 
-依据用户要求，先复用已有30份API响应及15案例真值，详见[既有证据复核](2026-10-06-capture-evidence-review.md)。当前顺序为E01证据差异盘点（完成）→E02离线验收数据（业务字段/编号和工具已完成；真实Excel映射待输入）→K02/K03→K04离线回放→K05/K06真实服务与页面→K07用户验收。K01已有模块不重做。15案例验证默认复用冻结响应，只有缺响应、模型/提示/schema变化或真实服务验收才定向补调用；不得每阶段重跑整套。全文逐字段真值仍需补充，不能称全字段已评分。
+依据用户要求，先复用已有30份API响应及15案例真值，详见[既有证据复核](2026-10-06-capture-evidence-review.md)。当前顺序为E01证据差异盘点（完成）→E02离线验收数据（业务字段/编号和工具已完成；真实Excel映射待输入）→K02a（基础完成）/K03→K04离线回放→K05/K06真实服务与页面→K07用户验收。K01已有模块不重做。15案例验证默认复用冻结响应，只有缺响应、模型/提示/schema变化或真实服务验收才定向补调用；不得每阶段重跑整套。全文逐字段真值仍需补充，不能称全字段已评分。
 
 ## 1. 本轮确认与证据
 
@@ -62,7 +62,7 @@
 | 单元 | 实现与代码范围 | 验收 | 当前状态 |
 |---|---|---|---|
 | K01 分类采用规则 | `packages/importing/category-decision.ts`公共纯模块；复用`application/transaction-edit.ts`和user_edits；新单测 | 用户分类胜过晚到来源/AI；来源胜过AI；非法AI类别回其他；无建议不阻塞；不产生资金修改 | 本轮实现模块，集成待K04 |
-| K02 任务状态与可靠性 | 新`packages/application/capture-task.ts`及存储端口；`apps/web/src/storage.ts`、`packages/storage`、`cloudbase`按实际后端适配 | 刷新、上传中断、迟到响应、重复worker、取消竞争、过期清理、不同UID隔离；先本地模拟再真实云 | 待实现；云部署须完成可复查代码后按权限执行 |
+| K02 任务状态与可靠性 | 新`packages/application/capture-task.ts`及存储端口；`apps/web/src/storage.ts`、`packages/storage`、`cloudbase`按实际后端适配 | 刷新、上传中断、迟到响应、重复worker、取消竞争、过期清理、不同UID隔离；先本地模拟再真实云 | K02a应用服务/SQLite参考持久化已验证；网页/真实云/图片清理与账务衔接未验收 |
 | K03 多事件与证据 | `importing/types.ts/workspace.ts/dedup.ts`、`application/import-service.ts/import-execution.ts/import-ledger-intent.ts`及存储/备份/同步格式 | 15案例、05+06、14两退款、无号近似交易不误合并、删后重导、双向Excel顺序；旧数据兼容 | 待实现 |
 | K04 AI响应接公共流程 | 试验响应→版本化schema适配；分类K01、生命周期K02、多事件K03联合；`apps/web/src/import-v2-adapter.ts`旧兼容 | 字段/时间/整数分校验；用户修改期间迟到结果不覆盖；结果无直接资金写入权 | 待实现 |
 | K05 服务端受限调用 | CloudBase PostgreSQL任务/worker、私有图片、TokenHub服务端密钥；更新真实云说明 | 真实授权、请求次数预算、租约/幂等、断网重开、取消、TTL/清理；费用按实际usage | 待实现；不借此完成账本云同步或恢复 |
@@ -80,3 +80,7 @@
 ## 2026-10-06 E02与提示词补充
 
 见[离线输入与提示约束](2026-10-06-capture-prompt-and-offline-fixtures.md)。114业务字段/23编号私密标注、30响应哈希冻结、公共15合成案例、离线审核5项测试已完成；没有新API请求。提示版本必须记录，格式错误不直接归因于模型能力。真实Excel对应输入缺失，K03真实互导验收需补；K02独立任务开发可继续。v2提示仅草案，未启用或验证。
+
+## 2026-10-06 K02a补充
+
+见[任务基础验收](2026-10-06-capture-task-foundation.md)。应用服务、CAS/租约/超时先查旧请求/取消与提交事务、SQLite重开恢复10项测试通过；全量核心404/404及typecheck通过。没有接实际账务outcomes、Web/PG/图片清理，K02整体未完成；这些接入验收随K04–K06推进。下一项K03a多事件来源结构，继续冻结响应，不调用模型。
