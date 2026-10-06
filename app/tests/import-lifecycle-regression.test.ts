@@ -7,6 +7,8 @@ test('import lifecycle preserves user corrections, unresolved decisions and usab
  const {findings}=await runLifecycleAudit();
  assert.equal(findings.length,3);
  for(const finding of findings)assert.equal(finding.violation,false,JSON.stringify(finding));
+ const deleted=findings.find(f=>f.id==='REVIVE_OVERWRITES_CORRECTION')!;
+ assert.equal(deleted.disposition,'SKIP_DUPLICATE');assert.equal(deleted.observed?.deletedAt,deleted.expected?.deletedAt);
  const retry=findings.find(f=>f.id==='UNANSWERED_SOURCE_UPDATE_LOST_ON_RETRY')!;
  assert.equal(retry.retryDisposition,'SOURCE_UPDATE');assert.equal(retry.afterAttention,1);
  const batch=findings.find(f=>f.id==='FAILED_PREDECESSOR_BREAKS_BATCH')!;

@@ -54,9 +54,8 @@ export function reviewDraft(d:Draft,entities:Entity[],conflicts:Conflict[],refun
  if(existing.length){
   d.transactionId=existing[0].id;
   if(existing[0].fields.deleted_at){
-   // 删除态来源不阻断：重导入账时复活原交易并以本次识别覆盖（非阻断提示，继续走下方正常核验）。
-   d.reviveHint='原记录在回收站，入账将恢复并以本次识别为准';
-   if(['committed','linked'].includes(d.workflow||''))d.workflow='review';
+   d.workflow='linked';d.selected=false;d.reviveHint='';
+   d.issue='原记录已在回收站，本次导入已跳过；需要时可在回收站恢复';return d;
   }else{
    d.workflow=d.workflow==='committed'?'committed':'linked';d.selected=false;d.issue=existing.length>1?'同一来源对应多笔旧交易，请核验':identicalInterpretation(d,existing[0],entities)?'来源已存在，不重复入账':'已有来源的状态/类型/金额/时间不同，请核验；不会新增交易';return d;
   }

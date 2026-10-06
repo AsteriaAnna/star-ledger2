@@ -28,6 +28,7 @@ function advance(snapshot:LedgerSnapshot,command:BusinessCommand){
  * so a store transaction commits all ledger effects or none of them.
  */
 export function planImportExecution(plan:ImportCommitPlan,snapshot:LedgerSnapshot,now:string):ImportExecutionPlan{
+ if(plan.revivals.length)throw Error('IMPLICIT_IMPORT_RESTORE_FORBIDDEN');
  let working=snapshot;const commands:BusinessCommand[]=[];
  const created:string[]=[],createdRecords:string[]=[],revived:string[]=[],revivedRecords:string[]=[];
 
@@ -38,12 +39,6 @@ export function planImportExecution(plan:ImportCommitPlan,snapshot:LedgerSnapsho
  for(const update of plan.evidenceUpdates){
   const command:BusinessCommand={kind:'ATTACH_SOURCE_EVIDENCE',transactionId:update.transactionId,source:update.source};
   const next=advance(working,command);working=next.snapshot;commands.push(command);
- }
-
- for(const revival of plan.revivals){
-  const restore:BusinessCommand={kind:'RESTORE_TRANSACTION',transactionId:revival.transactionId};
-  const restored=advance(working,restore);working=restored.snapshot;commands.push(restore);
-  revived.push(revival.transactionId);revivedRecords.push(revival.externalRecordId);
  }
 
  for(const command of planLateRefundRelations(working)){const next=advance(working,command);working=next.snapshot;commands.push(command);}

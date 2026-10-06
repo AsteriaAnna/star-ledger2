@@ -202,7 +202,7 @@ async function importAttentionDialog(sessionId:string,attentionId:string){
   modal('核对来源变化',`<form id="v2-source-form"><p>当前账单：${fields(target)}</p><p>来源记录：${esc(source.facts.counterpartyRaw)} · ${moneyText(source.facts.amountFen)} 元 · ${esc(source.facts.statusRaw)} · ${esc(source.facts.channelRaw)}</p><p class="footnote">采用来源将更新账务信息，保留已有名称、备注和消费分类。原始证据仍会保留。${!target?'同一订单的其他矛盾版本将保留为未采用的证据。':''}</p>${review.options.map(option=>`<label class="source-choice"><input type="radio" name="mode" value="${option.mode}" required ${option.plan?'':'disabled'}> ${labels[option.mode]}</label><p class="footnote">${option.plan?`${fields(option.plan.preview)}<br>${describeMovements(option.plan.movements)}`:esc(sourceAnswerMessages[option.error||'']||'这项处理暂不可用，请先核对其他问题')}</p>`).join('')}<details><summary>查看原始来源</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(source.rawPayload)}</pre></details><div class="modal-actions"><button type="submit" class="primary" ${review.options.some(o=>o.plan)?'':'disabled'}>确认处理</button></div></form>`);
   const form=$<HTMLFormElement>('#v2-source-form');form.onsubmit=e=>{e.preventDefault();submit(form,async()=>{
    const mode=formData(form).mode;if(mode!=='KEEP_EXISTING'&&mode!=='APPLY_SOURCE')throw Error('INVALID_SOURCE_DECISION');
-   await answerImportSource(sessionId,attentionId,mode,review.context.token);await refresh();close();toast('来源处理决定已保存');
+   await answerImportSource(sessionId,attentionId,mode,review.context.token,!!target?.fields.deleted_at);await refresh();close();toast('来源处理决定已保存');
   });};return;
  }
  if(item.kind!=='ACCOUNT'||item.blocking)throw Error('STALE_IMPORT_ATTENTION');

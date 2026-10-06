@@ -92,6 +92,7 @@ export class ImportStatementService {
  }
 
  async resolve(input:ResolveImportInput):Promise<ResolveImportResult>{
+  if(input.prepared.records.some(r=>r.disposition==='REVIVE_EXISTING'))throw Error('IMPLICIT_IMPORT_RESTORE_FORBIDDEN');
   const captureEvidence=await this.workspace.listCaptureEvidence(input.prepared.session.id);
   const byRecord=new Map(input.records.map(record=>[record.id,record]));
   const allAttention:AttentionItem[]=[];
@@ -221,6 +222,9 @@ export class ImportStatementService {
    if(interpretation.externalRecordId!==record.id)throw Error('INTERPRETATION_RECORD_MISMATCH');
    const batchKey=keyOf(record);
    const sourceMatch=findSourceMatch({value:record.sourceIdentity,platform:record.platformRaw,profile:record.profile,orderId:record.facts.orderId,rawPayload:record.rawPayload,captureEventClass:record.capture?.sourceClass},input.ledger.entities);
+   if(!sourceMatch.activeTransactionIds.length&&sourceMatch.deletedTransactionIds.length===1){
+    skippedDuplicateCount++;prepared.push({externalRecordId:record.id,disposition:'SKIP_DUPLICATE',transactionId:sourceMatch.deletedTransactionIds[0],interpretation,attention:[]});continue;
+   }
    // Failed observations are evidence, not an already-created transaction target.
    if(!sourceMatch.transactionIds.length&&interpretation.status==='FAILED'){
     noEffectCount++;prepared.push({externalRecordId:record.id,disposition:'NO_EFFECT',transactionId:null,interpretation,attention:[]});continue;
@@ -250,8 +254,7 @@ export class ImportStatementService {
      const transactionId=refundMatch.transactionId??(representative?importedTransactionId(representative):null);
      const target=input.ledger.entities.find(e=>e.type==='transactions'&&e.id===transactionId);
      if(transactionId&&target?.fields.deleted_at){
-      const items=[createAttention({sessionId:input.sessionId,externalRecordId:record.id,kind:'POSSIBLE_DUPLICATE',question:'这份退款证据对应回收站记录，恢复需要明确选择',blocking:true,candidates:[{id:transactionId,label:transactionId}],createdAt:input.now})];
-      allAttention.push(...items);prepared.push({externalRecordId:record.id,disposition:'NEEDS_ATTENTION',transactionId,interpretation,attention:items});continue;
+      skippedDuplicateCount++;prepared.push({externalRecordId:record.id,disposition:'SKIP_DUPLICATE',transactionId,interpretation,attention:[]});continue;
      }
      if(transactionId&&!target?.fields.deleted_at){
       skippedDuplicateCount++;allAttention.push(...unresolved);prepared.push({externalRecordId:record.id,disposition:'SKIP_DUPLICATE',transactionId,interpretation,attention:unresolved,attachEvidence:true});continue;
@@ -284,16 +287,6 @@ export class ImportStatementService {
    if(sourceMatch.activeTransactionIds.length>1){
     const items=[createAttention({sessionId:input.sessionId,externalRecordId:record.id,kind:'POSSIBLE_DUPLICATE',question:'同一来源对应多笔现有账单，需要确认保留哪一笔',blocking:true,candidates:sourceMatch.activeTransactionIds.map(id=>({id,label:id})),createdAt:input.now})];
     allAttention.push(...items);prepared.push({externalRecordId:record.id,disposition:'NEEDS_ATTENTION',transactionId:null,interpretation,attention:items});continue;
-   }
-   if(sourceMatch.deletedTransactionIds.length===1){
-    const transactionId=sourceMatch.deletedTransactionIds[0];
-    if(sourceMatch.changedEvidenceTransactionIds.includes(transactionId)&&!sourceMatch.exactEvidenceTransactionIds.includes(transactionId)){
-     const items=[createAttention({sessionId:input.sessionId,externalRecordId:record.id,kind:'SOURCE_UPDATE',question:'回收站记录的来源已变化，需要先确认恢复及账务变化',blocking:true,candidates:[{id:transactionId,label:transactionId}],createdAt:input.now})];
-     allAttention.push(...items);prepared.push({externalRecordId:record.id,disposition:'NEEDS_ATTENTION',transactionId,interpretation,attention:items});continue;
-    }
-    const items=validateInterpretation(input.sessionId,record,interpretation,input.now);
-    allAttention.push(...items);
-    prepared.push({externalRecordId:record.id,disposition:'REVIVE_EXISTING',transactionId:sourceMatch.deletedTransactionIds[0],interpretation,attention:items});continue;
    }
    if(sourceMatch.deletedTransactionIds.length>1){
     const items=[createAttention({sessionId:input.sessionId,externalRecordId:record.id,kind:'POSSIBLE_DUPLICATE',question:'同一来源对应多笔回收站记录，需要确认恢复哪一笔',blocking:true,candidates:sourceMatch.deletedTransactionIds.map(id=>({id,label:id})),createdAt:input.now})];

@@ -28,7 +28,7 @@ function fixture(){
  }
  function context(id:string){const workspace=store.state.importWorkspace!;return sourceReviewContext(id,workspace.attention[id].find(a=>a.kind==='SOURCE_UPDATE')!.id,workspace,snapshot());}
  async function answer(id:string,mode:'KEEP_EXISTING'|'APPLY_SOURCE',token=context(id).token){
-  const c=context(id),plan=await planImportSourceAnswer({sessionId:id,attentionId:c.item.id,mode,expectedToken:token,now:at},store.state.importWorkspace!,snapshot());
+  const c=context(id),plan=await planImportSourceAnswer({sessionId:id,attentionId:c.item.id,mode,restoreDeleted:!!c.target?.fields.deleted_at,expectedToken:token,now:at},store.state.importWorkspace!,snapshot());
   new AccountingService(store,store.state.device).execute(plan.commands);store.state.importWorkspace=plan.workspace;return plan;
  }
  return {store,business,snapshot,upload,context,answer};
@@ -83,7 +83,7 @@ test('changed ledger invalidates a preview without clearing questions or recordi
 
 test('deleted target requires explicit restore decision; missing interpretations allow keep but never guess apply',async()=>{
  const h=fixture();await h.upload('first',row(10));const tx=h.store.entities.find(e=>e.type==='transactions')!;
- h.business.execute({kind:'DELETE_TRANSACTION',transactionId:tx.id,deletedAt:at});await h.upload('changed',row(20));
+ await h.upload('changed',row(20));h.business.execute({kind:'DELETE_TRANSACTION',transactionId:tx.id,deletedAt:at});
  delete h.store.state.importWorkspace!.interpretations;
  await assert.rejects(h.answer('changed','APPLY_SOURCE'),/IMPORT_INTERPRETATION_UNAVAILABLE/);
  await h.answer('changed','KEEP_EXISTING');const current=h.store.entities.find(e=>e.type==='transactions')!;
@@ -153,4 +153,37 @@ test('an adopted refund source can add an explicit original relation without dup
  const returns=h.store.entities.filter(e=>e.type==='transactions'&&e.fields.event_type==='REFUND');assert.equal(returns.length,1);
  const links=h.store.entities.filter(e=>e.type==='transaction_links'&&!e.fields.deleted_at&&e.fields.from_transaction_id===returns[0].id);
  assert.equal(links.length,1);assert.equal(links[0].fields.to_transaction_id,original.id);
+});
+
+
+test('normal reimport of a deleted corrected bill skips changed source without questions or financial writes',async()=>{
+ const h=fixture();await h.upload('first',row(10));const tx=h.store.entities.find(e=>e.type==='transactions')!;
+ h.business.executeBatch(planTransactionCorrection({transactionId:tx.id,expectedSnapshot:correctionSnapshot(h.store.entities,tx.id),correctedAt:at,replacement:{kind:'PURCHASE',id:tx.id,name:'用户名称',note:'用户备注',occurredAt:String(tx.fields.occurred_at),amount:1200,payer:null,categoryId:'用户分类'}},h.snapshot()).commands);
+ h.business.execute({kind:'DELETE_TRANSACTION',transactionId:tx.id,deletedAt:at});
+ const before=structuredClone(h.store.entities);await h.upload('again',row(20));
+ assert.deepEqual(h.store.entities,before);assert.equal(h.store.state.importWorkspace!.attention.again.length,0);
+ assert.equal(h.store.state.importWorkspace!.sessions.again.skippedDuplicateCount,1);
+ h.business.execute({kind:'RESTORE_TRANSACTION',transactionId:tx.id});
+ assert.equal(h.store.entities.find(e=>e.type==='transactions')!.fields.display_amount,1200);
+ assert.equal(h.store.entities.find(e=>e.type==='transactions')!.fields.note,'用户备注');
+ assert.equal(h.store.entities.find(e=>e.type==='consumption_effects')!.fields.category_id,'用户分类');
+});
+
+test('pending source review cannot restore a subsequently deleted bill without explicit intent',async()=>{
+ const h=fixture();await h.upload('first',row(10));await h.upload('changed',row(20));
+ const tx=h.store.entities.find(e=>e.type==='transactions')!;h.business.execute({kind:'DELETE_TRANSACTION',transactionId:tx.id,deletedAt:at});
+ const c=h.context('changed'),before=structuredClone(h.store.state);
+ for(const mode of ['KEEP_EXISTING','APPLY_SOURCE'] as const){
+  await assert.rejects(planImportSourceAnswer({sessionId:'changed',attentionId:c.item.id,mode,expectedToken:c.token,now:at},h.store.state.importWorkspace!,h.snapshot()),/EXPLICIT_RESTORE_REQUIRED/);
+  assert.deepEqual(h.store.state,before);
+ }
+ await h.answer('changed','KEEP_EXISTING');
+ assert.equal(h.store.entities.find(e=>e.type==='transactions')!.fields.deleted_at,null);
+ assert.equal(h.store.entities.find(e=>e.type==='transactions')!.fields.display_amount,1000);
+});
+
+test('deletion invalidates the old source preview even when restoration is requested',async()=>{
+ const h=fixture();await h.upload('first',row(10));await h.upload('changed',row(20));const token=h.context('changed').token;
+ const tx=h.store.entities.find(e=>e.type==='transactions')!;h.business.execute({kind:'DELETE_TRANSACTION',transactionId:tx.id,deletedAt:at});
+ const before=structuredClone(h.store.state);await assert.rejects(h.answer('changed','APPLY_SOURCE',token),/STALE_SOURCE_REVIEW/);assert.deepEqual(h.store.state,before);
 });

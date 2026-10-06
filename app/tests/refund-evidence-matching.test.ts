@@ -86,7 +86,7 @@ test('matching uses immutable source facts and never overwrites subsequent user 
 });
 test('numbered evidence pointing to a deleted weak refund neither creates nor restores a transaction',async()=>{
  const h=fixture();await h.ingest(screenshot('weak'));const tx=h.transactions()[0];h.business.execute({kind:'DELETE_TRANSACTION',transactionId:tx.id,deletedAt:at});
- const r=await h.ingest(excel('strong'));assert.equal(h.transactions().length,1);assert.equal(h.transactions()[0].fields.deleted_at,at);assert.equal(r.plan.blockedRecordIds.length,1);
+ const r=await h.ingest(excel('strong'));assert.equal(h.transactions().length,1);assert.equal(h.transactions()[0].fields.deleted_at,at);assert.equal(r.plan.blockedRecordIds.length,0);assert.equal(r.plan.skippedDuplicateIds.length,1);
 });
 test('one mixed screenshot batch uses the numbered representative and attaches its weak evidence without another posting',async()=>{
  const h=fixture(),a=screenshot('mixed',[null]),b=screenshot('mixed',['R']);b.records[0].id+='strong';

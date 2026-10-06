@@ -13,7 +13,7 @@ import {planTransactionCorrection} from './correction-service.ts';
 import {completeImportSessionFromOutcomes} from './import-execution.ts';
 
 export type SourceAnswerMode='KEEP_EXISTING'|'APPLY_SOURCE';
-export type SourceAnswerRequest={sessionId:string;attentionId:string;mode:SourceAnswerMode;expectedToken:string;now:string};
+export type SourceAnswerRequest={sessionId:string;attentionId:string;mode:SourceAnswerMode;expectedToken:string;now:string;restoreDeleted?:boolean};
 export function sourceReviewToken(workspace:ImportWorkspaceSnapshot,ledger:LedgerSnapshot){
  return bytesToHex(sha256(new TextEncoder().encode(JSON.stringify({workspace,ledger:{entities:ledger.entities,conflicts:ledger.conflicts}}))));
 }
@@ -21,7 +21,7 @@ export function sourceReviewContext(sessionId:string,attentionId:string,workspac
  const session=workspace.sessions[sessionId],item=workspace.attention[sessionId]?.find(a=>a.id===attentionId);
  const source=workspace.records[sessionId]?.find(r=>r.id===item?.externalRecordId);
  if(!session||!item||item.kind!=='SOURCE_UPDATE'||!source)throw Error('STALE_IMPORT_ATTENTION');
- const match=findSourceMatch({value:source.sourceIdentity,platform:source.platformRaw,profile:source.profile,orderId:source.facts.orderId,rawPayload:source.rawPayload},ledger.entities);
+ const match=findSourceMatch({value:source.sourceIdentity,platform:source.platformRaw,profile:source.profile,orderId:source.facts.orderId,rawPayload:source.rawPayload,captureEventClass:source.capture?.sourceClass},ledger.entities);
  if(match.transactionIds.length>1)throw Error('AMBIGUOUS_SOURCE_TARGET');
  const target=ledger.entities.find(e=>e.type==='transactions'&&e.id===match.transactionIds[0]);
  const interpretation=workspace.interpretations?.[sessionId]?.find(i=>i.externalRecordId===source.id);
@@ -36,7 +36,10 @@ export async function planImportSourceAnswer(input:SourceAnswerRequest,workspace
  if(input.mode==='KEEP_EXISTING'&&!target)throw Error('SOURCE_TARGET_REQUIRED');
  const commands:Command[]=[];let working=ledger;
  const advance=(command:BusinessCommand)=>{const next=interpret(command,working);commands.push(...next);working=applyCommands(working,next);};
- if(target?.fields.deleted_at)advance({kind:'RESTORE_TRANSACTION',transactionId:target.id});
+ if(target?.fields.deleted_at){
+  if(input.restoreDeleted!==true)throw Error('EXPLICIT_RESTORE_REQUIRED');
+  advance({kind:'RESTORE_TRANSACTION',transactionId:target.id});
+ }
  let transactionId=target?.id;let followups=workspace.attention[input.sessionId].filter(a=>a.externalRecordId===source.id&&a.kind!=='SOURCE_UPDATE');
  if(input.mode==='APPLY_SOURCE'){
   if(!interpretation)throw Error('IMPORT_INTERPRETATION_UNAVAILABLE');

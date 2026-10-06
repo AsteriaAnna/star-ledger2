@@ -1,4 +1,6 @@
 export const sourceAnswerMessages:Record<string,string>={
+ EXPLICIT_RESTORE_REQUIRED:'这笔账单已删除，请明确选择恢复，或在回收站恢复',
+ IMPLICIT_IMPORT_RESTORE_FORBIDDEN:'重新导入不会恢复已删除账单，请在回收站明确恢复',
  IMPORT_SESSION_NOT_RESUMABLE:'这次导入已完成或状态已变化，请刷新查看结果',
  STALE_SOURCE_REVIEW:'账本或导入记录已变化，请重新打开来源核对页面',
  SOURCE_TARGET_REQUIRED:'尚无对应账单，请选择采用这份来源',

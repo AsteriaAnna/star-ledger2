@@ -31,16 +31,16 @@ export async function previewImportSource(sessionId:string,attentionId:string){
  const ledger=project(state.ops),context=sourceReviewContext(sessionId,attentionId,workspace,ledger);
  const options=[];
  for(const mode of ['KEEP_EXISTING','APPLY_SOURCE'] as const){
-  try{const plan=await planImportSourceAnswer({sessionId,attentionId,mode,expectedToken:context.token,now:new Date().toISOString()},workspace,ledger);options.push({mode,plan,error:null});}
+  try{const plan=await planImportSourceAnswer({sessionId,attentionId,mode,restoreDeleted:!!context.target?.fields.deleted_at,expectedToken:context.token,now:new Date().toISOString()},workspace,ledger);options.push({mode,plan,error:null});}
   catch(error){options.push({mode,plan:null,error:error instanceof Error?error.message:String(error)});}
  }
  return {context,options,accounts:ledger.entities.filter(e=>e.type==='accounts')};
 }
 
-export async function answerImportSource(sessionId:string,attentionId:string,mode:SourceAnswerMode,expectedToken:string){
+export async function answerImportSource(sessionId:string,attentionId:string,mode:SourceAnswerMode,expectedToken:string,restoreDeleted=false){
  const state=await read(),workspace=state.importWorkspace;if(!workspace)throw Error('STALE_IMPORT_ATTENTION');
  const ledger=project(state.ops);
- const plan=await planImportSourceAnswer({sessionId,attentionId,mode,expectedToken,now:new Date().toISOString()},workspace,ledger);
+ const plan=await planImportSourceAnswer({sessionId,attentionId,mode,restoreDeleted,expectedToken,now:new Date().toISOString()},workspace,ledger);
  await mutate(store=>{
   if(!store.state.importWorkspace||sourceReviewToken(store.state.importWorkspace,{entities:store.entities,conflicts:store.conflicts})!==expectedToken)throw Error('STALE_SOURCE_REVIEW');
   new AccountingService(store,store.state.device).execute(plan.commands);store.state.importWorkspace=plan.workspace;finalizeImportRefunds(store,new Date().toISOString());

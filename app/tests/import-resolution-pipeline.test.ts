@@ -78,18 +78,18 @@ test('strong refund relation records known arrival while consumption allocation 
  assert.equal(result.records[0].relation?.state,'RESOLVED');assert.equal(result.records[0].ledgerState,'READY_FOR_LEDGER');assert.equal(result.records[0].attention.find(x=>x.kind==='CONSUMPTION_ALLOCATION')?.blocking,false);
 });
 
-test('revival resolves funding instead of rebuilding a known payer as null',async()=>{
+test('deleted source never rebuilds its financial postings on ordinary import',async()=>{
  const r=record('revive'),original={...tx('old'),fields:{...tx('old').fields,deleted_at:'2026-10-01T00:00:00Z'}};
  const evidence={...sourceEvidence('sr','old','revive'),fields:{...sourceEvidence('sr','old','revive').fields,platform:'支付宝',raw_payload:JSON.stringify({identity:'revive',profile:'本人',original:'{}'})}};
  const out=await pipeline(r,interpretation(r.id),[original,evidence,account('wallet','支付宝余额')]);
- assert.equal(out.records[0].disposition,'REVIVE_EXISTING');assert.equal(out.records[0].account?.accountId,'wallet');assert.equal(out.records[0].ledgerState,'READY_FOR_LEDGER');
+ assert.equal(out.records[0].disposition,'SKIP_DUPLICATE');assert.equal(out.records[0].account,null);assert.equal(out.records[0].ledgerState,'NOT_APPLICABLE');
 });
-test('revival does not bypass split-payment or invalid amount attention',async()=>{
+test('skipping a deleted source does not force completion of split payment or invalid input',async()=>{
  const original={...tx('old'),fields:{...tx('old').fields,deleted_at:'2026-10-01T00:00:00Z'}};
  const evidence={...sourceEvidence('sr','old','revive'),fields:{...sourceEvidence('sr','old','revive').fields,platform:'支付宝',raw_payload:JSON.stringify({identity:'revive',profile:'本人',original:'{}'})}};
  const r=record('revive');r.facts.channelRaw='余额 + 农业银行储蓄卡(2372)';
- const split=await pipeline(r,interpretation(r.id),[original,evidence]);assert.equal(split.records[0].ledgerState,'NEEDS_ATTENTION');assert.ok(split.records[0].attention.some(a=>a.kind==='SPLIT_PAYMENT'));
- const invalid=await pipeline(r,interpretation(r.id,{amountFen:null}),[original,evidence]);assert.equal(invalid.records[0].ledgerState,'NEEDS_ATTENTION');assert.ok(invalid.records[0].attention.some(a=>a.kind==='AMOUNT'));
+ const split=await pipeline(r,interpretation(r.id),[original,evidence]);assert.equal(split.records[0].ledgerState,'NOT_APPLICABLE');assert.equal(split.records[0].attention.length,0);
+ const invalid=await pipeline(r,interpretation(r.id,{amountFen:null}),[original,evidence]);assert.equal(invalid.records[0].ledgerState,'NOT_APPLICABLE');assert.equal(invalid.records[0].attention.length,0);
 });
 
 test('same-batch refund resolves its original even when the refund row comes first',async()=>{

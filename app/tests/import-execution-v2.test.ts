@@ -16,13 +16,13 @@ test('import execution creates all new intents in one validated command batch',t
  assert.deepEqual(execution.createdIds,['a','b']);assert.deepEqual(execution.skippedDuplicateIds,['dup']);
 });
 
-test('deleted imported transaction restores without replacing user facts in the same accounting batch',t=>{
+test('old automatic import revival is refused; explicit recycle restore preserves facts',t=>{
  const p=pair(t),service=new BusinessAccountingService(p.a.store,'a');
  service.execute(intent('old',1000));service.execute({kind:'DELETE_TRANSACTION',transactionId:'old',deletedAt:'2026-10-02T11:00:00Z'});
- const execution=planImportExecution({evidenceUpdates:[],newRecords:[],revivals:[{transactionId:'old',externalRecordId:'source'}],skippedDuplicateIds:[],noEffectRecordIds:[],blockedRecordIds:[],attentionRecordIds:[]},project(p.a.store.allOperations()),at);
- service.executeBatch(execution.commands);
+ assert.throws(()=>planImportExecution({evidenceUpdates:[],newRecords:[],revivals:[{transactionId:'old',externalRecordId:'source'}],skippedDuplicateIds:[],noEffectRecordIds:[],blockedRecordIds:[],attentionRecordIds:[]},project(p.a.store.allOperations()),at),/IMPLICIT_IMPORT_RESTORE_FORBIDDEN/);
+ service.execute({kind:'RESTORE_TRANSACTION',transactionId:'old'});
  const tx=p.a.store.get('transactions','old');assert.equal(tx?.fields.deleted_at,null);assert.equal(tx?.fields.display_amount,1000);
- assert.equal(p.a.store.get('consumption_effects','old:effect')?.fields.amount,1000);assert.deepEqual(execution.revivedIds,['old']);
+ assert.equal(p.a.store.get('consumption_effects','old:effect')?.fields.amount,1000);
 });
 
 test('invalid later intent prevents the whole import accounting batch from partially committing',t=>{
@@ -35,7 +35,7 @@ test('purged transaction cannot be revived by reimport',t=>{
  const p=pair(t),service=new BusinessAccountingService(p.a.store,'a');
  service.execute(intent('old'));service.execute({kind:'DELETE_TRANSACTION',transactionId:'old',deletedAt:'2026-10-02T11:00:00Z'});
  p.a.service.execute([{action:'PATCH_FIELD',entity:{type:'transactions',id:'old',fields:{purged_at:'2026-10-02T11:30:00Z'}}}]);
- assert.throws(()=>planImportExecution({evidenceUpdates:[],newRecords:[],revivals:[{transactionId:'old',externalRecordId:'source'}],skippedDuplicateIds:[],noEffectRecordIds:[],blockedRecordIds:[],attentionRecordIds:[]},project(p.a.store.allOperations()),at),/TRANSACTION_UNAVAILABLE/);
+ assert.throws(()=>planImportExecution({evidenceUpdates:[],newRecords:[],revivals:[{transactionId:'old',externalRecordId:'source'}],skippedDuplicateIds:[],noEffectRecordIds:[],blockedRecordIds:[],attentionRecordIds:[]},project(p.a.store.allOperations()),at),/IMPLICIT_IMPORT_RESTORE_FORBIDDEN/);
 });
 
 

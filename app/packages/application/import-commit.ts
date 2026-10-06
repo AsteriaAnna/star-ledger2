@@ -31,11 +31,7 @@ export function planImportCommit(result:ResolveImportResult,records:ExternalReco
   }
   if(record.disposition==='NO_EFFECT'){plan.noEffectRecordIds.push(record.externalRecordId);continue;}
   if(record.disposition==='NEEDS_ATTENTION'||record.ledgerState==='NEEDS_ATTENTION'){plan.blockedRecordIds.push(record.externalRecordId);continue;}
-  if(record.disposition==='REVIVE_EXISTING'){
-   if(!record.transactionId)throw Error('MISSING_REVIVE_TRANSACTION');
-   plan.revivals.push({transactionId:record.transactionId,externalRecordId:record.externalRecordId});
-   continue;
-  }
+  if(record.disposition==='REVIVE_EXISTING')throw Error('IMPLICIT_IMPORT_RESTORE_FORBIDDEN');
   if(record.disposition==='INTERPRETED'&&record.ledgerState==='READY_FOR_LEDGER'){
    plan.newRecords.push({externalRecordId:record.externalRecordId,intent:buildImportedLedgerIntent({resolved:record,source,captureEvidence:result.captureEvidence})});continue;
   }

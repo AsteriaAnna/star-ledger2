@@ -33,7 +33,7 @@ const findings=[];
  h.execute(planTransactionCorrection({transactionId:id,replacement,expectedSnapshot:correctionSnapshot(h.snapshot().entities,id),correctedAt:at},h.snapshot()).commands);
  h.execute([{kind:'DELETE_TRANSACTION',transactionId:id,deletedAt:at}]);
  const result=await h.commit([r],[meaning(r.id)]),tx=h.snapshot().entities.find(e=>e.type==='transactions'&&e.id===id)!;
- findings.push({id:'REVIVE_OVERWRITES_CORRECTION',disposition:result.resolved.records[0].disposition,expected:{amount:1200,note:'user-note'},observed:{amount:tx.fields.display_amount,note:tx.fields.note},violation:tx.fields.display_amount!==1200||tx.fields.note!=='user-note'});
+ findings.push({id:'REVIVE_OVERWRITES_CORRECTION',disposition:result.resolved.records[0].disposition,expected:{amount:1200,note:'user-note',deletedAt:at},observed:{amount:tx.fields.display_amount,note:tx.fields.note,deletedAt:tx.fields.deleted_at},violation:tx.fields.deleted_at!==at||tx.fields.display_amount!==1200||tx.fields.note!=='user-note'});
 }
 {
  const h=harness(),r=record('evidence');await h.commit([r],[meaning(r.id)]);

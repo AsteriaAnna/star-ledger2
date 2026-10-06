@@ -17,11 +17,11 @@ test('prepare auto-skips exact durable duplicate',async()=>{
  assert.equal(result.records[0].disposition,'SKIP_DUPLICATE');assert.equal(result.records[0].transactionId,'t1');assert.equal(result.session.skippedDuplicateCount,1);
 });
 
-test('prepare revives one deleted source instead of creating a duplicate',async()=>{
+test('prepare skips one deleted source without recreating or reviving it',async()=>{
  const workspace=new InMemoryImportWorkspace(),service=new ImportStatementService(workspace),r=record('source-1');
  const entities:Entity[]=[transaction('t1','2026-09-21T00:00:00Z'),{type:'source_records',id:'sr',fields:{transaction_id:'t1',source_type:'EXCEL',platform:'支付宝',raw_payload:JSON.stringify({identity:'source-1'}),created_at:'2026-09-20T04:00:00Z'}}];
  const result=await service.prepare({sessionId:'s',sourceType:'EXCEL',sourceSystem:'ALIPAY',records:[r],interpretations:[interpretation(r.id)],ledger:{entities,conflicts:[]},now:'2026-10-02T00:00:00Z'});
- assert.equal(result.records[0].disposition,'REVIVE_EXISTING');assert.equal(result.records[0].transactionId,'t1');
+ assert.equal(result.records[0].disposition,'SKIP_DUPLICATE');assert.equal(result.records[0].transactionId,'t1');assert.equal(result.records[0].attention.length,0);
 });
 
 test('failed source is preserved as no-effect without asking for missing amount/date',async()=>{
@@ -116,9 +116,9 @@ test('failed observation never consumes the identity of a later successful obser
  }
 });
 
-test('changed evidence for a deleted transaction requires a decision instead of restoring and overwriting',async()=>{
+test('changed evidence for a deleted transaction stays skipped until explicit restoration',async()=>{
  const r={...record('source-1'),rawPayload:'changed'};
  const ledger={entities:[transaction('t1','2026-10-02T00:00:00Z'),{type:'source_records' as const,id:'sr',fields:{transaction_id:'t1',source_type:'EXCEL',platform:'支付宝',raw_payload:JSON.stringify({version:3,identity:'source-1',profile:'本人',original:'original'})}}],conflicts:[]};
  const result=await new ImportStatementService(new InMemoryImportWorkspace()).prepare({sessionId:'s',sourceType:'EXCEL',sourceSystem:'ALIPAY',records:[r],interpretations:[interpretation(r.id)],ledger,now:'2026-10-03T00:00:00Z'});
- assert.equal(result.records[0].disposition,'NEEDS_ATTENTION');assert.equal(result.records[0].attention[0].kind,'SOURCE_UPDATE');
+ assert.equal(result.records[0].disposition,'SKIP_DUPLICATE');assert.equal(result.records[0].attention.length,0);
 });

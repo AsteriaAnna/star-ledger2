@@ -63,7 +63,7 @@
 |---|---|---|---|
 | K01 分类采用规则 | `packages/importing/category-decision.ts`公共纯模块；复用`application/transaction-edit.ts`和user_edits；新单测 | 用户分类胜过晚到来源/AI；来源胜过AI；非法AI类别回其他；无建议不阻塞；不产生资金修改 | 本轮实现模块，集成待K04 |
 | K02 任务状态与可靠性 | 新`packages/application/capture-task.ts`及存储端口；`apps/web/src/storage.ts`、`packages/storage`、`cloudbase`按实际后端适配 | 刷新、上传中断、迟到响应、重复worker、取消竞争、过期清理、不同UID隔离；先本地模拟再真实云 | K02a应用服务/SQLite参考持久化已验证；网页/真实云/图片清理与账务衔接未验收 |
-| K03 多事件与证据 | `importing/types.ts/workspace.ts/dedup.ts`、`application/import-service.ts/import-execution.ts/import-ledger-intent.ts`及存储/备份/同步格式 | 15案例、05+06、14两退款、无号近似交易不误合并、删后重导、双向Excel顺序；旧数据兼容 | K03a、K03b-1证据与K03b-2退款升级/匹配已限定验证；K03b-3删除态与真实互导未完成 |
+| K03 多事件与证据 | `importing/types.ts/workspace.ts/dedup.ts`、`application/import-service.ts/import-execution.ts/import-ledger-intent.ts`及存储/备份/同步格式 | 15案例、05+06、14两退款、无号近似交易不误合并、删后重导、双向Excel顺序；旧数据兼容 | K03a、K03b-1证据与K03b-2退款升级/匹配已限定验证；K03b-3删除态限定验证完成；真实互导与15案例整体入账仍未验收 |
 | K04 AI响应接公共流程 | 试验响应→版本化schema适配；分类K01、生命周期K02、多事件K03联合；`apps/web/src/import-v2-adapter.ts`旧兼容 | 字段/时间/整数分校验；用户修改期间迟到结果不覆盖；结果无直接资金写入权 | 待实现 |
 | K05 服务端受限调用 | CloudBase PostgreSQL任务/worker、私有图片、TokenHub服务端密钥；更新真实云说明 | 真实授权、请求次数预算、租约/幂等、断网重开、取消、TTL/清理；费用按实际usage | 待实现；不借此完成账本云同步或恢复 |
 | K06 页面与编辑串联 | `apps/web/src/ocr.ts/main.ts/detail-editor.ts/detail-drafts.ts`及导入页面拆分 | 单/多图、可离开页面、结果直达编辑、单项放弃；分类统计更新、退款跟随、没有再次填整表 | 待K01–K05通过后接入 |
@@ -96,3 +96,7 @@
 ## 2026-10-06 K03b-2补充
 
 [退款匹配验收](2026-10-06-refund-cross-source-matching.md)：新15项/核心436项通过，核心/Web类型、平台与构建通过。退款关键源事实一致及唯一时只补来源，不新增交易或覆盖用户更正；多候选/低精度不自动合并。未回放真实模型响应、未真实云/浏览器/真机验收；无新模型请求。下一小项K03b-3删除后普通重导不静默复活，之后K04解析和K05/K06服务页面。
+
+## 2026-10-06 K03b-3补充
+
+[删除态与显式恢复验收](2026-10-06-import-deletion-and-explicit-restore.md)：新增3项/核心439项、核心/Web类型、平台与构建通过。普通重导保留删除/更正，不新增缺字段问题；恢复沿用回收站，旧来源核对必须明确意图；旧隐式恢复计划拒绝。浏览器缺Chromium未运行，真实互导/云/真机未验收。下一项K04冻结响应→版本化事实校验与公共分类/任务/事件集成，之后服务页面；无新模型调用或部署。

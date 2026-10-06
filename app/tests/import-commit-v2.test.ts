@@ -34,10 +34,9 @@ test('non-blocking attention never prevents a known financial fact from committi
  assert.equal(plan.newRecords.length,1);assert.equal(plan.newRecords[0].intent.kind,'REFUND');assert.deepEqual(plan.blockedRecordIds,[]);
 });
 
-test('revive plan preserves existing transaction identity instead of creating a second economic record',()=>{
+test('obsolete implicit revive disposition is rejected before a commit plan is produced',()=>{
  const r=source('revive'),row=resolved('revive',{disposition:'REVIVE_EXISTING',transactionId:'old-transaction',ledgerState:'NOT_APPLICABLE'});
- const plan=planImportCommit({session:{...session,sourceCount:1},records:[row]},[r]);
- assert.equal(plan.newRecords.length,0);assert.equal(plan.revivals.length,1);assert.equal(plan.revivals[0].transactionId,'old-transaction');assert.equal('replacement' in plan.revivals[0],false);
+ assert.throws(()=>planImportCommit({session:{...session,sourceCount:1},records:[row]},[r]),/IMPLICIT_IMPORT_RESTORE_FORBIDDEN/);
 });
 
 test('commit planning fails if a resolved record has lost its source evidence',()=>{
