@@ -6,7 +6,7 @@ import {importWebCapture} from './capture-import-flow.ts';
 import type {CaptureJob} from './capture-jobs.ts';
 import type {CaptureEvidence} from '../../../packages/importing/types.ts';
 import type {CaptureTask} from '../../../packages/application/capture-task.ts';
-export const captureMessages:Record<string,string>={CLOUD_AUTH_REQUIRED:'请先登录你的测试账号',CAPTURE_ACCESS_DENIED:'此账号还未加入截图试用名单',CAPTURE_SERVICE_NOT_CONFIGURED:'识别服务尚未配置，请稍后再试',CAPTURE_SERVICE_UNAVAILABLE:'识别服务暂时无法连接，可以稍后重试',CAPTURE_MODEL_UNAVAILABLE:'识别服务暂时繁忙，可以重试',CAPTURE_MODEL_OUTPUT_INVALID:'识别结果不完整，没有新增账单',CAPTURE_PLATFORM_MISMATCH:'截图来源与所选平台不一致，请重新选择平台',INVALID_CAPTURE_RESPONSE_JSON:'识别结果格式有误，没有新增账单',CAPTURE_RETRY_LIMIT:'这次识别已重试，请手动记录或重新选择截图',CAPTURE_NOT_PAYMENT:'这不是可直接记账的支付详情截图',CAPTURE_EXPIRED:'任务已过期，请重新选择截图',STALE_CAPTURE_IMPORT_PLAN:'账本刚刚发生了变化，请点击继续处理'};
+export const captureMessages:Record<string,string>={CAPTURE_IMAGE_TOO_LARGE:'截图不能超过4 MB，请选择较小的截图',INVALID_CAPTURE_IMAGE_TYPE:'请选择PNG、JPEG或WebP截图',CLOUD_AUTH_REQUIRED:'请先登录你的测试账号',CAPTURE_ACCESS_DENIED:'此账号还未加入截图试用名单',CAPTURE_SERVICE_NOT_CONFIGURED:'识别服务尚未配置，请稍后再试',CAPTURE_SERVICE_UNAVAILABLE:'识别服务暂时无法连接，可以稍后重试',CAPTURE_MODEL_UNAVAILABLE:'识别服务暂时繁忙，可以重试',CAPTURE_MODEL_OUTPUT_INVALID:'识别结果不完整，没有新增账单',CAPTURE_PLATFORM_MISMATCH:'截图来源与所选平台不一致，请重新选择平台',INVALID_CAPTURE_RESPONSE_JSON:'识别结果格式有误，没有新增账单',CAPTURE_RETRY_LIMIT:'这次识别已重试，请手动记录或重新选择截图',CAPTURE_NOT_PAYMENT:'这不是可直接记账的支付详情截图',CAPTURE_EXPIRED:'任务已过期，请重新选择截图',STALE_CAPTURE_IMPORT_PLAN:'账本刚刚发生了变化，请点击继续处理'};
 export const captureMessage=(code?:string)=>captureMessages[code??'']??'截图需要核对，尚未新增账单。可以补充缺失信息或放弃。';
 function ledgerFor(uid:string){return 'cloud-'+bytesToHex(sha256(new TextEncoder().encode(uid))).slice(0,32);}
 async function identity(uid?:string){const session=await cloudbaseSession();if(!session||uid&&uid!==session.uid)throw Error('CLOUD_AUTH_REQUIRED');assertLocalLedgerOwner(session.uid);return session;}
@@ -17,7 +17,7 @@ async function call(job:CaptureJob,action:string,extra:Record<string,unknown>={}
  return response.result.value as {task:CaptureTask;evidence:CaptureEvidence|null}|null;
 }
 export async function createWebCapture(file:File,sourceSystem:'WECHAT'|'ALIPAY'){
- const session=await identity();if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>4*1024*1024)throw Error('请选择不超过4 MB的PNG、JPEG或WebP截图');
+ const session=await identity();if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw Error('INVALID_CAPTURE_IMAGE_TYPE');if(file.size>4*1024*1024)throw Error('CAPTURE_IMAGE_TOO_LARGE');
  const contentHash=bytesToHex(sha256(new Uint8Array(await file.arrayBuffer()))),state=await read();
  const old=Object.values(state.captureJobs??{}).find(j=>j.uid===session.uid&&j.contentHash===contentHash&&j.sourceSystem===sourceSystem&&j.state!=='CANCELLED'&&j.expiresAt>Date.now());if(old)return old;
  const now=Date.now(),job:CaptureJob={id:'capture:'+crypto.randomUUID(),uid:session.uid,ledgerId:ledgerFor(session.uid),contentHash,sourceSystem,mime:file.type,image:file,createdAt:now,expiresAt:now+86400000,state:'QUEUED'};
@@ -39,7 +39,7 @@ export function runWebCapture(id:string):Promise<void>{if(running.has(id))return
    if(job.evidence){await importWebCapture(id);return;}
    const prior=await call(job,'read');if(prior){await acceptResult(id,prior);if(prior.evidence||['CANCELLED','EXPIRED','ANALYZING'].includes(prior.task.state))return;}
    if(!job.image)throw Error('CAPTURE_EXPIRED');
-   await call(job,'queue');await mutate(s=>{const current=s.state.captureJobs?.[id];if(current&&current.state!=='CANCELLED')current.state='WAITING';});
+   await call(job,'queue');await mutate(s=>{const current=s.state.captureJobs?.[id];if(current&&current.state!=='CANCELLED')current.state='WAITING';});window.dispatchEvent(new Event('capture-updated'));
    const current=(await read()).captureJobs?.[id];if(!current||current.state==='CANCELLED')return;
    const bytes=new Uint8Array(await job.image.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
    await acceptResult(id,await call(job,'analyze',{image:btoa(binary),mime:job.mime}));

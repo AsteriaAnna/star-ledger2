@@ -9,6 +9,7 @@ export function captureJobPanels(state:State){return Object.values(state.capture
 type UI={modal:(title:string,html:string)=>void;close:()=>void;refresh:()=>Promise<void>;openImport:()=>void;error:(e:unknown)=>void;toast:(s:string)=>void};
 let ui:UI;
 export function installCapturePage(callbacks:UI){ui=callbacks;
+ window.addEventListener('capture-updated',()=>{void ui.refresh().catch(ui.error);});
  document.addEventListener('click',ev=>{const el=(ev.target as Element).closest<HTMLElement>('button');if(!el)return;
   const action=el.dataset.captureRetry?'retry':el.dataset.captureAbandon?'abandon':el.dataset.captureSupplement?'supplement':null;
   const id=el.dataset.captureRetry||el.dataset.captureAbandon||el.dataset.captureSupplement;if(!action||!id)return;
