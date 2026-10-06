@@ -64,7 +64,7 @@
 | K01 分类采用规则 | `packages/importing/category-decision.ts`公共纯模块；复用`application/transaction-edit.ts`和user_edits；新单测 | 用户分类胜过晚到来源/AI；来源胜过AI；非法AI类别回其他；无建议不阻塞；不产生资金修改 | 本轮实现模块，集成待K04 |
 | K02 任务状态与可靠性 | 新`packages/application/capture-task.ts`及存储端口；`apps/web/src/storage.ts`、`packages/storage`、`cloudbase`按实际后端适配 | 刷新、上传中断、迟到响应、重复worker、取消竞争、过期清理、不同UID隔离；先本地模拟再真实云 | K02a应用服务/SQLite参考持久化已验证；网页/真实云/图片清理与账务衔接未验收 |
 | K03 多事件与证据 | `importing/types.ts/workspace.ts/dedup.ts`、`application/import-service.ts/import-execution.ts/import-ledger-intent.ts`及存储/备份/同步格式 | 15案例、05+06、14两退款、无号近似交易不误合并、删后重导、双向Excel顺序；旧数据兼容 | K03a、K03b-1证据与K03b-2退款升级/匹配已限定验证；K03b-3删除态限定验证完成；真实互导与15案例整体入账仍未验收 |
-| K04 AI响应接公共流程 | 试验响应→版本化schema适配；分类K01、生命周期K02、多事件K03联合；`apps/web/src/import-v2-adapter.ts`旧兼容 | 字段/时间/整数分校验；用户修改期间迟到结果不覆盖；结果无直接资金写入权 | 待实现 |
+| K04 AI响应接公共流程 | 试验响应→版本化schema适配；分类K01、生命周期K02、多事件K03联合；`apps/web/src/import-v2-adapter.ts`旧兼容 | 字段/时间/整数分校验；用户修改期间迟到结果不覆盖；结果无直接资金写入权 | experiment-1适配/公共流程与SQLite参考原子提交已限定验证；真实页面/PG未接 |
 | K05 服务端受限调用 | CloudBase PostgreSQL任务/worker、私有图片、TokenHub服务端密钥；更新真实云说明 | 真实授权、请求次数预算、租约/幂等、断网重开、取消、TTL/清理；费用按实际usage | 待实现；不借此完成账本云同步或恢复 |
 | K06 页面与编辑串联 | `apps/web/src/ocr.ts/main.ts/detail-editor.ts/detail-drafts.ts`及导入页面拆分 | 单/多图、可离开页面、结果直达编辑、单项放弃；分类统计更新、退款跟随、没有再次填整表 | 待K01–K05通过后接入 |
 | K07 全流程用户验收 | 本轮15截图+真实Excel、手机用户执行、窄屏/弱网/重复与删除 | 可用与错误场景均核对；用户接受后推进下一项；Android系统分享留安装版真机节点 | 待用户验收 |
@@ -100,3 +100,7 @@
 ## 2026-10-06 K03b-3补充
 
 [删除态与显式恢复验收](2026-10-06-import-deletion-and-explicit-restore.md)：新增3项/核心439项、核心/Web类型、平台与构建通过。普通重导保留删除/更正，不新增缺字段问题；恢复沿用回收站，旧来源核对必须明确意图；旧隐式恢复计划拒绝。浏览器缺Chromium未运行，真实互导/云/真机未验收。下一项K04冻结响应→版本化事实校验与公共分类/任务/事件集成，之后服务页面；无新模型调用或部署。
+
+## 2026-10-06 K04补充
+
+[已有响应接公共流程](2026-10-06-capture-response-import-integration.md)：新增12项/核心451项及类型/平台/构建通过。30冻结响应回放，图片14份事件种类/数量/金额符合，15号JSON拒绝；文字11份符合，存在重复/缺字段。公共导入、最新用户分类、任务scope/结果与原子完成凭证接通，SQLite参考完成/回滚/编辑竞争验证。未接Web/PG/真实云，无新增API请求。提取核对UI、持久结果/TTL、真实UID/凭证待K05/K06；真实互导未验收。下一项K05，不重选模型。

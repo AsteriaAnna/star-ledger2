@@ -10,6 +10,8 @@
 
 ## 当前重要证据
 
+- [AI响应→公共导入集成](2026-10-06-capture-response-import-integration.md)：冻结响应回放、分类/任务/原子结果边界；下一项真实识别服务。
+
 - [AI截图基础计划](2026-10-05-ai-capture-development-plan.md)：阶段与验收；[多事件来源](2026-10-06-capture-multi-event-foundation.md)、[正式证据保存与恢复](2026-10-06-capture-ledger-evidence-persistence.md)、[退款跨来源匹配](2026-10-06-refund-cross-source-matching.md)、[删除态与显式恢复](2026-10-06-import-deletion-and-explicit-restore.md)为限定本地实施记录。
 
 - [真实文件导入修复](2026-10-05-import-fixes-progress.md)：169+169样本结果与未完成资金端。
