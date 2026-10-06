@@ -9,21 +9,23 @@ function taskValid(t){
  if(!t||![t.userId,t.ledgerId,t.id,t.contentHash,t.requestVersion].every(v=>{token(v);return true;})||!Number.isSafeInteger(t.version)||t.version<0||!['LOCAL_QUEUED','UPLOADING','ACCEPTED','ANALYZING','RECONCILING','READY','NEEDS_INPUT','RETRYABLE_FAILURE','CANCELLED','EXPIRED'].includes(t.state)||!Number.isSafeInteger(t.createdAt)||!Number.isSafeInteger(t.updatedAt)||!Number.isSafeInteger(t.expiresAt)||t.expiresAt<=t.createdAt||t.receipt!==null)throw Error('INVALID_REMOTE_CAPTURE_TASK');
 }
 function rows(r){
- if(!r||!Array.isArray(r.Columns)||!Array.isArray(r.Rows)||r.Columns.length!==1||r.Columns[0]!=='payload')throw Error('INVALID_CAPTURE_SQL_RESULT');
- return r.Rows.map(row=>{let values;try{values=JSON.parse(row);}catch{throw Error('INVALID_CAPTURE_SQL_ROW');}if(!Array.isArray(values)||values.length!==1||typeof values[0]!=='string')throw Error('INVALID_CAPTURE_SQL_ROW');try{return JSON.parse(values[0]);}catch{throw Error('INVALID_CAPTURE_SQL_PAYLOAD');}});
+ if(!r||!Array.isArray(r.Columns)||(r.Rows!==null&&!Array.isArray(r.Rows))||r.Columns.length!==1||r.Columns[0]!=='payload')throw Error('INVALID_CAPTURE_SQL_RESULT');
+ return (r.Rows??[]).map(row=>{let values;try{values=JSON.parse(row);}catch{throw Error('INVALID_CAPTURE_SQL_ROW');}if(!Array.isArray(values)||values.length!==1||typeof values[0]!=='string')throw Error('INVALID_CAPTURE_SQL_ROW');try{return JSON.parse(values[0]);}catch{throw Error('INVALID_CAPTURE_SQL_PAYLOAD');}});
 }
 function expectedTask(s,id,v,next){taskValid(next);if(next.userId!==s.userId||next.ledgerId!==s.ledgerId||next.id!==id||next.version!==v+1||!Number.isSafeInteger(v)||v<0)throw Error('INVALID_CAPTURE_REPLACEMENT');}
 class CapturePostgresRepository {
  constructor(executePGSql){if(typeof executePGSql!=='function')throw Error('CAPTURE_SQL_TRANSPORT_REQUIRED');this.executePGSql=executePGSql;}
  async query(Sql){return rows(await this.executePGSql({Sql,Role:'service_role'}));}
+ // ExecutePGSql commits DML but omits RETURNING rows. Success is its affected-row count.
+ async write(Sql){const r=await this.executePGSql({Sql,Role:'service_role'});if(!r||!Number.isSafeInteger(r.AffectedRows)||![0,1].includes(r.AffectedRows))throw Error('INVALID_CAPTURE_SQL_AFFECTED_ROWS');return r.AffectedRows===1;}
  async create(task){
   taskValid(task);if(task.version!==0||task.state!=='LOCAL_QUEUED'||task.result!==null)throw Error('INVALID_CAPTURE_CREATE');
-  const r=await this.query(`INSERT INTO public.star_ledger_capture_task (user_id,ledger_id,task_id,version,payload) VALUES (${literal(task.userId)},${literal(task.ledgerId)},${literal(task.id)},0,${json(task)}) ON CONFLICT DO NOTHING RETURNING payload`);return r.length===1;
+  return this.write(`INSERT INTO public.star_ledger_capture_task (user_id,ledger_id,task_id,version,payload) VALUES (${literal(task.userId)},${literal(task.ledgerId)},${literal(task.id)},0,${json(task)}) ON CONFLICT DO NOTHING`);
  }
  async get(scope,id){const r=await this.query(`SELECT payload FROM public.star_ledger_capture_task WHERE ${scopeWhere(scope)} AND task_id=${literal(token(id))}`);if(r.length>1)throw Error('INVALID_CAPTURE_SQL_RESULT');if(!r.length)return null;taskValid(r[0]);if(r[0].userId!==scope.userId||r[0].ledgerId!==scope.ledgerId||r[0].id!==id)throw Error('CAPTURE_SCOPE_MISMATCH');return r[0];}
  async replace(scope,id,version,next){
   expectedTask(scope,id,version,next);
-  const r=await this.query(`UPDATE public.star_ledger_capture_task SET version=${next.version},payload=${json(next)} WHERE ${scopeWhere(scope)} AND task_id=${literal(token(id))} AND version=${version} AND payload->'result' IS NOT DISTINCT FROM ${json(next.result)} AND payload->>'contentHash'=${literal(next.contentHash)} AND payload->>'requestVersion'=${literal(next.requestVersion)} RETURNING payload`);return r.length===1;
+  return this.write(`UPDATE public.star_ledger_capture_task SET version=${next.version},payload=${json(next)} WHERE ${scopeWhere(scope)} AND task_id=${literal(token(id))} AND version=${version} AND payload->'result' IS NOT DISTINCT FROM ${json(next.result)} AND payload->>'contentHash'=${literal(next.contentHash)} AND payload->>'requestVersion'=${literal(next.requestVersion)}`);
  }
  /** Result acceptance is a single SQL statement: version-fenced task and immutable extraction together. */
  async publish(scope,id,version,next,evidence){

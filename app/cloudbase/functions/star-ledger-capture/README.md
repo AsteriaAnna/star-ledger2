@@ -11,3 +11,7 @@ READY状态必须与完整CaptureEvidence一次SQL提交。普通replace保持�
 该仓库故意不实现客户端账本提交：云结果保存与本机账务提交属于不同数据库，不能承诺同一事务。完成本机账务使用已有capture-import流程；后续可靠领取/回执协议单独落实。
 
 真实PG并发、权限/回滚验证待执行。当前测试只是公共状态服务及SQL传输契约，不是PostgreSQL集成测试。
+
+## 2026-10-06真实验收修正
+
+真实API对普通DML仅提供AffectedRows，不提供RETURNING行；create/replace使用0/1计数。SELECT有payload列而Rows:null是空结果。003后必须再应用004-capture-service-role-privileges.sql，避免建表默认ACL遗留service_role全权限；有效权限用capture-privilege-audit.sql复读。真实整改复测尚未完成，见docs/2026-10-06-capture-pg-real-acceptance-and-fixes.md。

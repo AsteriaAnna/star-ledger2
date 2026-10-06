@@ -35,14 +35,51 @@ test('READY retrieval requires durable immutable evidence rather than only a res
 test('SQL serialization scopes every request and encodes arbitrary text without string interpolation injection',async()=>{
  const queries:{Sql:string;Role:string}[]=[];const dangerous="u'; DROP TABLE anything; --";
  const task=newCaptureTask({userId:dangerous,ledgerId:'l'},'t','image','v1',0,1000);
- const repo=new CapturePostgresRepository(async(q:{Sql:string;Role:string})=>{queries.push(q);return {Columns:['payload'],Rows:[JSON.stringify([JSON.stringify(task)])]};});
+ const repo=new CapturePostgresRepository(async(q:{Sql:string;Role:string})=>{queries.push(q);return q.Sql.startsWith('INSERT')?{Columns:null,Rows:null,AffectedRows:1}:{Columns:['payload'],Rows:[JSON.stringify([JSON.stringify(task)])]};});
  assert.equal(await repo.create(task),true);assert.deepEqual(await repo.get({userId:dangerous,ledgerId:'l'},'t'),task);
  assert.ok(queries.every(q=>q.Role==='service_role'&&!q.Sql.includes(dangerous)));assert.match(queries[1].Sql,/user_id=.* AND ledger_id=.* AND task_id=/);
  await assert.rejects(repo.complete(),/REMOTE_CAPTURE_CANNOT_COMMIT_LOCAL_LEDGER/);
 });
 test('PG publish uses one version-fenced statement for task and immutable result, transport errors are not successes',async()=>{
  const queries:string[]=[];const task=analysing(),next=changeCaptureTask(task,{kind:'RESULT',token:'w',attempt:1,result:{id:e.id,responseHash:e.responseHash,schemaVersion:e.schemaVersion,promptVersion:e.promptVersion}},4);
- const repo=new CapturePostgresRepository(async(q:{Sql:string})=>{queries.push(q.Sql);return {Columns:['payload'],Rows:[]};});
+ const repo=new CapturePostgresRepository(async(q:{Sql:string})=>{queries.push(q.Sql);return {Columns:['payload'],Rows:null};});
  assert.equal(await repo.publish(scope,'t',task.version,next,e),false);assert.equal(queries.length,1);assert.match(queries[0],/WITH accepted AS/);assert.match(queries[0],/INSERT INTO public.star_ledger_capture_result/);assert.match(queries[0],/version=3/);
- const broken=new CapturePostgresRepository(async()=>({AffectedRows:1,Rows:null,Columns:null}));await assert.rejects(broken.create(newCaptureTask(scope,'t','image','v1',0,1000)),/INVALID_CAPTURE_SQL_RESULT/);
+ const broken=new CapturePostgresRepository(async()=>({Rows:null,Columns:null}));await assert.rejects(broken.create(newCaptureTask(scope,'t','image','v1',0,1000)),/INVALID_CAPTURE_SQL_AFFECTED_ROWS/);
+});
+
+
+test('real CloudBase DML response samples return success or CAS loss without relying on RETURNING',async()=>{
+ const queries:string[]=[],responses=[1,0,1,0];
+ const repo=new CapturePostgresRepository(async(q:{Sql:string})=>{queries.push(q.Sql);return {Columns:null,Rows:null,AffectedRows:responses.shift()};});
+ const t=newCaptureTask(scope,'t','image','v1',0,1000),next=changeCaptureTask(t,{kind:'START_UPLOAD'},1);
+ assert.equal(await repo.create(t),true);assert.equal(await repo.create(t),false);
+ assert.equal(await repo.replace(scope,'t',0,next),true);assert.equal(await repo.replace(scope,'t',0,next),false);
+ assert.equal(queries.length,4);assert.ok(queries.every(sql=>!sql.includes('RETURNING')));
+});
+test('real empty SELECT response normalizes absent task/result and cross scope to null',async()=>{
+ const repo=new CapturePostgresRepository(async()=>({Columns:['payload'],Rows:null,AffectedRows:0}));
+ assert.equal(await repo.get(scope,'missing'),null);assert.equal(await repo.result(scope,'missing','result'),null);
+ assert.equal(await repo.get({...scope,userId:'other'},'t'),null);
+ assert.equal(await new RemoteCaptureService(repo).read('u','l','missing'),null);
+});
+test('queue and cancel work through the SQL adapter with committed DML response shapes',async()=>{
+ let stored:CaptureTask|null=null;const initial=newCaptureTask(scope,'t','image','capture-request-1',0,24*3600000);
+ const repo=new CapturePostgresRepository(async(q:{Sql:string})=>{
+  if(q.Sql.startsWith('INSERT')){const n=stored?0:1;if(n)stored=initial;return {Columns:null,Rows:null,AffectedRows:n};}
+  if(q.Sql.startsWith('UPDATE')){if(!stored||stored.version!==0)return {Columns:null,Rows:null,AffectedRows:0};stored=changeCaptureTask(stored,{kind:'CANCEL'},1);return {Columns:null,Rows:null,AffectedRows:1};}
+  return {Columns:['payload'],Rows:stored?[JSON.stringify([JSON.stringify(stored)])]:null};
+ });
+ const service=new RemoteCaptureService(repo);assert.deepEqual(await service.queue('u','l','t','image',0),initial);
+ assert.deepEqual(await service.queue('u','l','t','image',1),initial);
+ assert.equal((await service.cancel('u','l','t',0,1)).state,'CANCELLED');
+ assert.equal((await service.read('u','l','t'))!.task.state,'CANCELLED');
+ await assert.rejects(service.cancel('u','l','t',0,2),/CAPTURE_VERSION_CONFLICT/);
+});
+test('malformed affected counts and missing SELECT column metadata remain technical errors',async()=>{
+ for(const value of [undefined,-1,2,'1',NaN]){
+  const repo=new CapturePostgresRepository(async()=>({Columns:null,Rows:null,AffectedRows:value}));
+  await assert.rejects(repo.create(newCaptureTask(scope,'t','image','v1',0,1000)),/INVALID_CAPTURE_SQL_AFFECTED_ROWS/);
+ }
+ const repo=new CapturePostgresRepository(async()=>({Columns:null,Rows:null,AffectedRows:0}));
+ await assert.rejects(repo.get(scope,'t'),/INVALID_CAPTURE_SQL_RESULT/);
 });
