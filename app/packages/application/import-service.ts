@@ -1,6 +1,7 @@
 import {applyCommands,interpret} from '../accounting/business.ts';
-import {buildImportedLedgerIntent,sourceDecisionId} from './import-ledger-intent.ts';
+import {buildImportedLedgerIntent,sourceDecisionId,importedTransactionId} from './import-ledger-intent.ts';
 import type {LedgerSnapshot} from '../accounting/index.ts';
+import {planRefundEvidenceMatches} from '../importing/refund-evidence-matching.ts';
 import {findSourceMatch} from '../importing/dedup.ts';
 import {createAttention,summarizeSession} from '../importing/attention.ts';
 import type {AttentionItem,CaptureEvidence,EventInterpretation,ExternalRecord,ImportSession,ImportSourceType,SourceSystem} from '../importing/types.ts';
@@ -13,6 +14,7 @@ import {resolveReturnAllocation} from '../domain/return-allocation.ts';
 export type ImportDisposition='INTERPRETED'|'NO_EFFECT'|'SKIP_DUPLICATE'|'REVIVE_EXISTING'|'SOURCE_UPDATE'|'NEEDS_ATTENTION';
 
 export type PreparedImportRecord={
+ attachEvidence?:boolean;
  externalRecordId:string;
  disposition:ImportDisposition;
  transactionId:string|null;
@@ -209,6 +211,7 @@ export class ImportStatementService {
    if(byRecord.get(record.id)?.status==='FAILED')continue;
    const key=keyOf(record),raws=observations.get(key)??new Set<string>();raws.add(record.rawPayload);observations.set(key,raws);
   }
+  const refundMatches=planRefundEvidenceMatches(input.records,input.interpretations,input.ledger.entities,input.ledger.conflicts);
   const batchSources=new Map<string,string>();
   let skippedDuplicateCount=0,noEffectCount=0;
 
@@ -239,6 +242,25 @@ export class ImportStatementService {
    }
    if(sourceMatch.activeTransactionIds.length===1&&unresolved.some(a=>a.kind==='SOURCE_UPDATE')){
     allAttention.push(...unresolved);prepared.push({externalRecordId:record.id,disposition:'SOURCE_UPDATE',transactionId:sourceMatch.activeTransactionIds[0],interpretation,attention:unresolved});continue;
+   }
+   const refundMatch=refundMatches.get(record.id);
+   if(refundMatch&&sourceMatch.deletedTransactionIds.length===0&&sourceMatch.transactionIds.length<=1){
+    if(refundMatch.automatic){
+     const representative=refundMatch.recordId?input.records.find(r=>r.id===refundMatch.recordId):null;
+     const transactionId=refundMatch.transactionId??(representative?importedTransactionId(representative):null);
+     const target=input.ledger.entities.find(e=>e.type==='transactions'&&e.id===transactionId);
+     if(transactionId&&target?.fields.deleted_at){
+      const items=[createAttention({sessionId:input.sessionId,externalRecordId:record.id,kind:'POSSIBLE_DUPLICATE',question:'这份退款证据对应回收站记录，恢复需要明确选择',blocking:true,candidates:[{id:transactionId,label:transactionId}],createdAt:input.now})];
+      allAttention.push(...items);prepared.push({externalRecordId:record.id,disposition:'NEEDS_ATTENTION',transactionId,interpretation,attention:items});continue;
+     }
+     if(transactionId&&!target?.fields.deleted_at){
+      skippedDuplicateCount++;allAttention.push(...unresolved);prepared.push({externalRecordId:record.id,disposition:'SKIP_DUPLICATE',transactionId,interpretation,attention:unresolved,attachEvidence:true});continue;
+     }
+    }
+    if(!refundMatch.automatic&&!sourceMatch.exactEvidenceTransactionIds.length&&!sourceMatch.activeTransactionIds.length){
+     const items=[createAttention({sessionId:input.sessionId,externalRecordId:record.id,kind:'POSSIBLE_DUPLICATE',question:'退款证据存在相似或多个候选，需要确认对应关系',blocking:true,candidates:refundMatch.candidates.map(id=>({id,label:id})),createdAt:input.now})];
+     allAttention.push(...items);prepared.push({externalRecordId:record.id,disposition:'NEEDS_ATTENTION',transactionId:null,interpretation,attention:items});continue;
+    }
    }
    const priorRaw=sourceMatch.transactionIds.length?undefined:batchSources.get(batchKey);
    if(priorRaw!==undefined){

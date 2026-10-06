@@ -33,6 +33,7 @@ export function importSourcePayload(source:ExternalRecord,evidence:CaptureEviden
   original:source.rawPayload,
   parserVersion:source.parserVersion,
   precision:source.facts.precision,
+  ...(!source.capture?{normalizedFacts:source.facts}:{}),
   ...(source.capture?{capture:source.capture,captureEvidenceVersion:1,captureEvidence:container}:{})
  });
 }

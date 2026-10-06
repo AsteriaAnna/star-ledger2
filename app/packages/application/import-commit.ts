@@ -21,7 +21,10 @@ export function planImportCommit(result:ResolveImportResult,records:ExternalReco
  for(const record of result.records){
   const source=sources.get(record.externalRecordId);if(!source)throw Error('MISSING_EXTERNAL_RECORD');
   if(record.attention.length)plan.attentionRecordIds.push(record.externalRecordId);
-  if(record.disposition==='SKIP_DUPLICATE'){plan.skippedDuplicateIds.push(record.externalRecordId);continue;}
+  if(record.disposition==='SKIP_DUPLICATE'){
+   if(record.attachEvidence&&record.transactionId)plan.evidenceUpdates.push({externalRecordId:record.externalRecordId,transactionId:record.transactionId,source:importedSourceEvidence(source,result.captureEvidence)});
+   plan.skippedDuplicateIds.push(record.externalRecordId);continue;
+  }
   if(record.disposition==='SOURCE_UPDATE'){
    if(record.transactionId)plan.evidenceUpdates.push({externalRecordId:record.externalRecordId,transactionId:record.transactionId,source:importedSourceEvidence(source,result.captureEvidence)});
    plan.blockedRecordIds.push(record.externalRecordId);continue;
