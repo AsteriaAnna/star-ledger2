@@ -3,7 +3,7 @@ import {buildImportedLedgerIntent,sourceDecisionId} from './import-ledger-intent
 import type {LedgerSnapshot} from '../accounting/index.ts';
 import {findSourceMatch} from '../importing/dedup.ts';
 import {createAttention,summarizeSession} from '../importing/attention.ts';
-import type {AttentionItem,EventInterpretation,ExternalRecord,ImportSession,ImportSourceType,SourceSystem} from '../importing/types.ts';
+import type {AttentionItem,CaptureEvidence,EventInterpretation,ExternalRecord,ImportSession,ImportSourceType,SourceSystem} from '../importing/types.ts';
 import type {ImportWorkspaceRepository,ResolutionMemoryRepository} from './ports.ts';
 import {resolveAccount,resolveLedgerAccount,type AccountResolution,type AccountResolutionRequest} from '../importing/account-resolution.ts';
 import {resolveRefundRelation,type RefundRelationResolution} from '../importing/relation-resolution.ts';
@@ -45,6 +45,7 @@ export type ResolveImportInput={
 };
 
 export type PrepareImportInput={
+ captureEvidence?:CaptureEvidence[];
  sessionId:string;
  sourceType:ImportSourceType;
  sourceSystem:SourceSystem;
@@ -214,7 +215,7 @@ export class ImportStatementService {
    if(!interpretation)throw Error('MISSING_INTERPRETATION');
    if(interpretation.externalRecordId!==record.id)throw Error('INTERPRETATION_RECORD_MISMATCH');
    const batchKey=keyOf(record);
-   const sourceMatch=findSourceMatch({value:record.sourceIdentity,platform:record.platformRaw,profile:record.profile,orderId:record.facts.orderId,rawPayload:record.rawPayload},input.ledger.entities);
+   const sourceMatch=findSourceMatch({value:record.sourceIdentity,platform:record.platformRaw,profile:record.profile,orderId:record.facts.orderId,rawPayload:record.rawPayload,captureEventClass:record.capture?.sourceClass},input.ledger.entities);
    // Failed observations are evidence, not an already-created transaction target.
    if(!sourceMatch.transactionIds.length&&interpretation.status==='FAILED'){
     noEffectCount++;prepared.push({externalRecordId:record.id,disposition:'NO_EFFECT',transactionId:null,interpretation,attention:[]});continue;
@@ -286,7 +287,7 @@ export class ImportStatementService {
   }
 
   const session=summarizeSession({...base,sourceCount:input.records.length,skippedDuplicateCount,noEffectCount,updatedAt:input.now},allAttention,input.now);
-  await this.workspace.saveSessionSnapshot(session,input.records,allAttention,input.interpretations);
+  await this.workspace.saveSessionSnapshot(session,input.records,allAttention,input.interpretations,input.captureEvidence);
   return {session,records:prepared};
  }
 }

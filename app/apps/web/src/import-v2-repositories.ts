@@ -1,4 +1,5 @@
-import type {AttentionItem,EventInterpretation,ExternalRecord,ImportRecordOutcome,ImportSession} from '../../../packages/importing/types.ts';
+import {applyCaptureSessionEvidence} from '../../../packages/importing/workspace.ts';
+import type {AttentionItem,CaptureEvidence,EventInterpretation,ExternalRecord,ImportRecordOutcome,ImportSession} from '../../../packages/importing/types.ts';
 import type {ImportWorkspaceSnapshot} from '../../../packages/importing/workspace.ts';
 import type {AccountIdentity,AccountMapping,CategoryMapping,ImportWorkspaceRepository,MerchantIdentity,ResolutionMemoryRepository} from '../../../packages/application/ports.ts';
 import {legacyAccountMemoryMigrationCommands,readAccountMapping,readMerchantCategory,rememberAccountMappingCommand,rememberMerchantCategoryCommand} from '../../../packages/importing/resolution-memory.ts';
@@ -19,17 +20,19 @@ export class WebImportWorkspaceRepository implements ImportWorkspaceRepository {
   for(const record of records){const list=next.records[record.sessionId]??[],index=list.findIndex(value=>value.id===record.id);if(index<0)list.push(structuredClone(record));else list[index]=structuredClone(record);next.records[record.sessionId]=list;}
   store.state.importWorkspace=next;
  });}
+ async listCaptureEvidence(sessionId:string){const state=await read();return structuredClone(state.importWorkspace?.captureEvidence?.[sessionId]??[]);}
  async listAttentionItems(sessionId:string){const state=await read();return structuredClone(state.importWorkspace?.attention[sessionId]??[]);}
  async replaceAttentionItems(sessionId:string,items:AttentionItem[]){await mutate(store=>{const next=workspace(store.state.importWorkspace);next.attention[sessionId]=structuredClone(items);store.state.importWorkspace=next;});}
  async listOutcomes(sessionId:string){const state=await read();return structuredClone(state.importWorkspace?.outcomes?.[sessionId]??[]);}
  async replaceOutcomes(sessionId:string,outcomes:ImportRecordOutcome[]){if(outcomes.some(item=>item.sessionId!==sessionId))throw Error('IMPORT_SESSION_MISMATCH');await mutate(store=>{const next=workspace(store.state.importWorkspace);next.outcomes[sessionId]=structuredClone(outcomes);store.state.importWorkspace=next;});}
- async saveSessionSnapshot(session:ImportSession,records:ExternalRecord[],items:AttentionItem[],interpretations?:EventInterpretation[]){await mutate(store=>{
+ async saveSessionSnapshot(session:ImportSession,records:ExternalRecord[],items:AttentionItem[],interpretations?:EventInterpretation[],captureEvidence?:CaptureEvidence[]){await mutate(store=>{
   if(records.some(record=>record.sessionId!==session.id)||items.some(item=>item.sessionId!==session.id))throw Error('IMPORT_SESSION_MISMATCH');
   const next=workspace(store.state.importWorkspace);
+  applyCaptureSessionEvidence(next,session.id,records,captureEvidence);
   next.sessions[session.id]=structuredClone(session);next.records[session.id]=structuredClone(records);next.attention[session.id]=structuredClone(items);next.outcomes[session.id]??=[];if(interpretations){next.interpretations??={};next.interpretations[session.id]=structuredClone(interpretations);}
   store.state.importWorkspace=next;
  });}
- async clearSession(id:string){await mutate(store=>{const next=workspace(store.state.importWorkspace);delete next.interpretations?.[id];delete next.sessions[id];delete next.records[id];delete next.attention[id];delete next.outcomes[id];store.state.importWorkspace=next;});}
+ async clearSession(id:string){await mutate(store=>{const next=workspace(store.state.importWorkspace);delete next.captureEvidence?.[id];delete next.interpretations?.[id];delete next.sessions[id];delete next.records[id];delete next.attention[id];delete next.outcomes[id];store.state.importWorkspace=next;});}
 }
 
 export class LedgerResolutionMemoryRepository implements ResolutionMemoryRepository {

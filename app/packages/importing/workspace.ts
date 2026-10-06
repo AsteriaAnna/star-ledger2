@@ -1,18 +1,27 @@
-import type {AttentionItem,EventInterpretation,ExternalRecord,ImportRecordOutcome,ImportSession} from './types.ts';
+import type {AttentionItem,CaptureEvidence,EventInterpretation,ExternalRecord,ImportRecordOutcome,ImportSession} from './types.ts';
+import {mergeCaptureEvidence,validateCaptureReferences} from './capture-evidence.ts';
 import type {ImportWorkspaceRepository} from '../application/ports.ts';
 
 export type ImportWorkspaceSnapshot={
  interpretations?:Record<string,EventInterpretation[]>;
+ captureEvidence?:Record<string,CaptureEvidence[]>;
  sessions:Record<string,ImportSession>;
  records:Record<string,ExternalRecord[]>;
  attention:Record<string,AttentionItem[]>;
  outcomes:Record<string,ImportRecordOutcome[]>;
 };
 
+export function applyCaptureSessionEvidence(snapshot:ImportWorkspaceSnapshot,sessionId:string,records:ExternalRecord[],incoming?:CaptureEvidence[]){
+ const evidence=mergeCaptureEvidence(snapshot.captureEvidence?.[sessionId]??[],incoming??[]);
+ validateCaptureReferences(records,evidence);
+ if(incoming||snapshot.captureEvidence?.[sessionId]){snapshot.captureEvidence??={};snapshot.captureEvidence[sessionId]=evidence;}
+}
+
 export class InMemoryImportWorkspace implements ImportWorkspaceRepository {
  private data:ImportWorkspaceSnapshot;
  constructor(seed?:Partial<ImportWorkspaceSnapshot>){
-  this.data={interpretations:structuredClone(seed?.interpretations??{}),sessions:structuredClone(seed?.sessions??{}),records:structuredClone(seed?.records??{}),attention:structuredClone(seed?.attention??{}),outcomes:structuredClone(seed?.outcomes??{})};
+  this.data={...(seed?.captureEvidence?{captureEvidence:structuredClone(seed.captureEvidence)}:{}),interpretations:structuredClone(seed?.interpretations??{}),sessions:structuredClone(seed?.sessions??{}),records:structuredClone(seed?.records??{}),attention:structuredClone(seed?.attention??{}),outcomes:structuredClone(seed?.outcomes??{})};
+  for(const [id,records] of Object.entries(this.data.records))validateCaptureReferences(records,this.data.captureEvidence?.[id]??[]);
  }
  async getSession(id:string){return structuredClone(this.data.sessions[id]??null);}
  async listSessions(){return structuredClone(Object.values(this.data.sessions).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)||a.id.localeCompare(b.id)));}
@@ -26,15 +35,16 @@ export class InMemoryImportWorkspace implements ImportWorkspaceRepository {
    this.data.records[record.sessionId]=list;
   }
  }
+ async listCaptureEvidence(sessionId:string){return structuredClone(this.data.captureEvidence?.[sessionId]??[]);}
  async listAttentionItems(sessionId:string){return structuredClone(this.data.attention[sessionId]??[]);}
  async replaceAttentionItems(sessionId:string,items:AttentionItem[]){this.data.attention[sessionId]=structuredClone(items);}
  async listOutcomes(sessionId:string){return structuredClone(this.data.outcomes[sessionId]??[]);}
  async replaceOutcomes(sessionId:string,outcomes:ImportRecordOutcome[]){if(outcomes.some(item=>item.sessionId!==sessionId))throw Error('IMPORT_SESSION_MISMATCH');this.data.outcomes[sessionId]=structuredClone(outcomes);}
- async saveSessionSnapshot(session:ImportSession,records:ExternalRecord[],items:AttentionItem[],interpretations?:EventInterpretation[]){
+ async saveSessionSnapshot(session:ImportSession,records:ExternalRecord[],items:AttentionItem[],interpretations?:EventInterpretation[],captureEvidence?:CaptureEvidence[]){
   if(records.some(record=>record.sessionId!==session.id)||items.some(item=>item.sessionId!==session.id))throw Error('IMPORT_SESSION_MISMATCH');
-  const next=structuredClone(this.data);next.sessions[session.id]=structuredClone(session);next.records[session.id]=structuredClone(records);next.attention[session.id]=structuredClone(items);if(interpretations){next.interpretations??={};next.interpretations[session.id]=structuredClone(interpretations);}this.data=next;
+  const next=structuredClone(this.data);applyCaptureSessionEvidence(next,session.id,records,captureEvidence);next.sessions[session.id]=structuredClone(session);next.records[session.id]=structuredClone(records);next.attention[session.id]=structuredClone(items);if(interpretations){next.interpretations??={};next.interpretations[session.id]=structuredClone(interpretations);}this.data=next;
  }
- async clearSession(id:string){delete this.data.interpretations?.[id];delete this.data.sessions[id];delete this.data.records[id];delete this.data.attention[id];delete this.data.outcomes[id];}
+ async clearSession(id:string){delete this.data.captureEvidence?.[id];delete this.data.interpretations?.[id];delete this.data.sessions[id];delete this.data.records[id];delete this.data.attention[id];delete this.data.outcomes[id];}
  snapshot(){return structuredClone(this.data);}
 }
 
@@ -52,7 +62,7 @@ export interface WorkspaceStorage {
  * This repository is deliberately outside Operation/GitHub sync.
  */
 export class LocalImportWorkspace implements ImportWorkspaceRepository {
- private readonly memory:InMemoryImportWorkspace;
+ private memory:InMemoryImportWorkspace;
  private readonly storage:WorkspaceStorage;
  private readonly key:string;
  constructor(storage:WorkspaceStorage,key='star-ledger:v2:import-workspace'){
@@ -68,12 +78,15 @@ export class LocalImportWorkspace implements ImportWorkspaceRepository {
  async putSession(session:ImportSession){await this.memory.putSession(session);this.persist();}
  async listExternalRecords(sessionId:string){return this.memory.listExternalRecords(sessionId);}
  async putExternalRecords(records:ExternalRecord[]){await this.memory.putExternalRecords(records);this.persist();}
+ async listCaptureEvidence(sessionId:string){return this.memory.listCaptureEvidence(sessionId);}
  async listAttentionItems(sessionId:string){return this.memory.listAttentionItems(sessionId);}
  async replaceAttentionItems(sessionId:string,items:AttentionItem[]){await this.memory.replaceAttentionItems(sessionId,items);this.persist();}
  async listOutcomes(sessionId:string){return this.memory.listOutcomes(sessionId);}
  async replaceOutcomes(sessionId:string,outcomes:ImportRecordOutcome[]){await this.memory.replaceOutcomes(sessionId,outcomes);this.persist();}
- async saveSessionSnapshot(session:ImportSession,records:ExternalRecord[],items:AttentionItem[],interpretations?:EventInterpretation[]){
-  await this.memory.saveSessionSnapshot(session,records,items,interpretations);this.persist();
+ async saveSessionSnapshot(session:ImportSession,records:ExternalRecord[],items:AttentionItem[],interpretations?:EventInterpretation[],captureEvidence?:CaptureEvidence[]){
+  const next=new InMemoryImportWorkspace(this.memory.snapshot());
+  await next.saveSessionSnapshot(session,records,items,interpretations,captureEvidence);
+  this.storage.setItem(this.key,JSON.stringify(next.snapshot()));this.memory=next;
  }
  async clearSession(id:string){await this.memory.clearSession(id);this.persist();}
 }

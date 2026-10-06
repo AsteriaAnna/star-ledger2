@@ -28,7 +28,8 @@ export function importSourcePayload(source:ExternalRecord){
   targetChannel:source.facts.targetChannelRaw??null,
   original:source.rawPayload,
   parserVersion:source.parserVersion,
-  precision:source.facts.precision
+  precision:source.facts.precision,
+  ...(source.capture?{capture:source.capture}:{})
  });
 }
 

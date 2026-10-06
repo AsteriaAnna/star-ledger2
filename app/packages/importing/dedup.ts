@@ -1,6 +1,6 @@
 import type {Entity} from '../domain/index.ts';
 
-export type SourceIdentity={value:string;platform:string;profile:string;orderId?:string|null;rawPayload?:string};
+export type SourceIdentity={value:string;platform:string;profile:string;orderId?:string|null;rawPayload?:string;captureEventClass?:'payment'|'refund'};
 
 export type SourceMatch={
  transactionIds:string[];
@@ -21,8 +21,8 @@ export function findSourceMatch(identity:SourceIdentity,entities:Entity[]):Sourc
  for(const source of entities.filter(e=>e.type==='source_records')){
   const payload=json(source.fields.raw_payload);if(!payload)continue;
   if(payload.identity===identity.value&&source.fields.platform===identity.platform&&(payload.profile?payload.profile===identity.profile:identity.profile==='本人')){const transactionId=String(source.fields.transaction_id);ids.add(transactionId);matchedBy.add('SOURCE_IDENTITY');if(identity.rawPayload!==undefined&&payload.version===3&&typeof payload.original==='string'){if(payload.original===identity.rawPayload)exact.add(transactionId);else changed.add(transactionId);}continue;}
-  if(identity.profile==='本人'&&source.id==='source-'+identity.value){ids.add(String(source.fields.transaction_id));matchedBy.add('LEGACY_SOURCE_ID');continue;}
-  if(identity.orderId&&payload.order===identity.orderId&&source.fields.platform===identity.platform&&(payload.profile?payload.profile===identity.profile:identity.profile==='本人')){
+  if(!identity.captureEventClass&&identity.profile==='本人'&&source.id==='source-'+identity.value){ids.add(String(source.fields.transaction_id));matchedBy.add('LEGACY_SOURCE_ID');continue;}
+  if(!identity.captureEventClass&&identity.orderId&&payload.order===identity.orderId&&source.fields.platform===identity.platform&&(payload.profile?payload.profile===identity.profile:identity.profile==='本人')){
    ids.add(String(source.fields.transaction_id));matchedBy.add('LEGACY_ORDER');
   }
  }

@@ -1,3 +1,4 @@
+import {validateCaptureReferences,mergeCaptureEvidence} from '../../../packages/importing/capture-evidence.ts';
 import {ledgerSettings,planLedgerSettings,planLegacyLedgerSettings} from '../../../packages/application/ledger-settings.ts';
 import type {Operation,Entity,EntityType,Batch,Conflict,FieldVersion} from '../../../packages/domain/index.ts';
 import type {SyncStore} from '../../../packages/platform/ports.ts';
@@ -24,6 +25,9 @@ export function validateImportWorkspace(value:unknown):ImportWorkspaceSnapshot{
  for(const [id,items] of Object.entries(outcomes) as [string,any[]][]){if(!ids.has(id)||!Array.isArray(items)||items.some(o=>!o||o.sessionId!==id||typeof o.externalRecordId!=='string'||!['COMMITTED','SKIPPED_DUPLICATE','NO_EFFECT','BLOCKED'].includes(o.state)))throw Error('备份导入恢复状态格式无效');}
  const interpretations=v.interpretations??{};if(!interpretations||typeof interpretations!=='object'||Array.isArray(interpretations))throw Error('备份解释格式无效');
  for(const [id,items] of Object.entries(interpretations) as [string,any[]][]){const recordIds=new Set((v.records[id]??[]).map((r:any)=>r.id));if(!ids.has(id)||!Array.isArray(items)||new Set(items.map(i=>i?.externalRecordId)).size!==items.length||items.some(i=>!i||!recordIds.has(i.externalRecordId)||typeof i.eventKind!=='string'||!['SUCCESS','PENDING','FAILED','UNKNOWN'].includes(i.status)||(i.amountFen!==null&&!Number.isSafeInteger(i.amountFen))||(i.occurredAt!==null&&typeof i.occurredAt!=='string')||typeof i.displayName!=='string'||!Array.isArray(i.evidence)))throw Error('备份解释格式无效');}
+ const captures=v.captureEvidence??{};if(!captures||typeof captures!=='object'||Array.isArray(captures))throw Error('INVALID_CAPTURE_BACKUP');
+ for(const [id,evidence] of Object.entries(captures)){if(!ids.has(id)||!Array.isArray(evidence))throw Error('INVALID_CAPTURE_BACKUP');validateCaptureReferences(v.records[id]??[],evidence);}
+ for(const [id,records] of Object.entries(v.records))validateCaptureReferences(records as any[],captures[id]??[]);
  return structuredClone({...v,outcomes,...(v.interpretations?{interpretations}:{})}) as ImportWorkspaceSnapshot;
 }
 function mergeImportWorkspace(current:ImportWorkspaceSnapshot|undefined,incoming:ImportWorkspaceSnapshot){
@@ -31,6 +35,7 @@ function mergeImportWorkspace(current:ImportWorkspaceSnapshot|undefined,incoming
  for(const [id,session] of Object.entries(incoming.sessions)){
   const existing=out.sessions[id];if(existing&&existing.updatedAt>=session.updatedAt)continue;
   out.interpretations??={};out.interpretations[id]=structuredClone(incoming.interpretations?.[id]??[]);
+  if(incoming.captureEvidence?.[id]){out.captureEvidence??={};out.captureEvidence[id]=mergeCaptureEvidence(out.captureEvidence[id]??[],incoming.captureEvidence[id]);}
   out.sessions[id]=structuredClone(session);out.records[id]=structuredClone(incoming.records[id]??[]);out.attention[id]=structuredClone(incoming.attention[id]??[]);out.outcomes[id]=structuredClone(incoming.outcomes?.[id]??[]);
  }
  return out;

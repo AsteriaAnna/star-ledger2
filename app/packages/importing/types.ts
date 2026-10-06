@@ -23,6 +23,18 @@ export type NormalizedSourceFacts={
  precision:SourcePrecision;
 };
 
+/** Shared extraction container, not a transaction and never contains image bytes. */
+export type CaptureEvidence={
+ id:string;contentHash:string;responseHash:string;schemaVersion:string;promptVersion:string;model:string;
+ pageKind:'payment_detail'|'ledger_record'|'unknown';
+ sourceSystem:'WECHAT'|'ALIPAY';platformRaw:string;profile:string;
+ rawExtraction:string;capturedAt:string;
+};
+export type CaptureRecordReference={
+ evidenceId:string;observationId:string;region:string;ordinal:number;
+ sourceClass:'payment'|'refund';identityStrength:'STRONG'|'OBSERVATION';
+};
+
 export type ExternalRecord={
  id:string;
  sessionId:string;
@@ -35,6 +47,7 @@ export type ExternalRecord={
  facts:NormalizedSourceFacts;
  parserVersion:number;
  capturedAt:string;
+ capture?:CaptureRecordReference;
 };
 
 export type InterpretedEventKind=

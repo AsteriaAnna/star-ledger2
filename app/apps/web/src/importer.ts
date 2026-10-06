@@ -1,3 +1,4 @@
+import {strongSourceEventIdentity} from '../../../packages/importing/source-event-identity.ts';
 import {hash,money,wallDate} from './normalize.ts';
 import {needsSplit} from './channels.ts';
 import {sourceCategory} from './categories.ts';
@@ -46,7 +47,7 @@ export function parseRows(rows:any[][],config:{originalMode?:string;refundHint?:
   // 无单号来源：用内容指纹 + 出现序数稳定识别，跨文件改动不再漂移（替代 batch+row）；有单号仍用稳定单号。
   const sourceClass=refundEvent?'refund':'payment';const eventId=refundEvent?(refundId||order):order;
   let identity:string;
-  if(eventId)identity=hash({v:2,platform,profile,sourceClass,eventId});
+  if(eventId)identity=strongSourceEventIdentity(platform,profile,sourceClass,eventId);
   else{const contentKey=hash({v:3,platform,profile,at:date.utc,amount,type,counterparty:cell(row,'交易对方','对方名称')});const occurrence=seen.get(contentKey)||0;seen.set(contentKey,occurrence+1);identity=hash({v:3,contentKey,occurrence});}
   const d:Draft={key:identity,identity,itemId:hash({batch,profile,platform,row:rowIndex}),batch,profile,sourceClass,originalOrder,platform,name,amount,date:date.wall,precision:date.precision,kind,status,channel,account:'',to:'',category:sourceCategory(platform,cell(row,'交易分类'),name,product),sourceCategory:cell(row,'交易分类'),original:'',note:useful(cell(row,'备注'))||product,raw,issue:'',selected:false,sourceType:'EXCEL',order:refundId||order,sponsor,consumption:'0',fee,blockers,confirmed:[],workflow:status==='FAILED'?'noeffect':'review',parserVersion:3};
   d.issue=issues(d).join('；');d.selected=status==='SUCCESS'&&!d.issue;out.push(d);
