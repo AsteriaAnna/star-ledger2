@@ -42,7 +42,7 @@ export function captureEventRecords(evidence:CaptureEvidence,sessionId:string,ob
    rawPayload:JSON.stringify({version:1,capture,facts}),facts,parserVersion,capturedAt:evidence.capturedAt,capture};
  });
 }
-export function validateCaptureReferences(records:ExternalRecord[],evidence:CaptureEvidence[]){
+export function validateCaptureReferences(records:Pick<ExternalRecord,'sourceType'|'sourceSystem'|'platformRaw'|'profile'|'capture'>[],evidence:CaptureEvidence[]){
  const byId=new Map<string,CaptureEvidence>();
  for(const item of evidence){validateCaptureEvidence(item);if(byId.has(item.id))throw Error('DUPLICATE_CAPTURE_EVIDENCE');byId.set(item.id,item);}
  for(const record of records){

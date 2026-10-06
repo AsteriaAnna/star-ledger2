@@ -43,13 +43,13 @@ export async function planImportSourceAnswer(input:SourceAnswerRequest,workspace
   if(interpretation.status!=='SUCCESS')throw Error('SOURCE_STATUS_REQUIRES_REVIEW');
   // Evaluate the replacement without the old postings consuming refund quota.
   const clean={...working,entities:working.entities.filter(e=>!(e.type==='transactions'&&e.id===target?.id)&&!(target&&(e.fields.transaction_id===target.id||e.fields.from_transaction_id===target.id)))};
-  const service=new ImportStatementService(new InMemoryImportWorkspace(),{
+  const service=new ImportStatementService(new InMemoryImportWorkspace(workspace),{
    findAccountMapping:async key=>readAccountMapping(clean.entities,key),rememberAccountMapping:async()=>{},findMerchantCategory:async()=>null,rememberMerchantCategory:async()=>{}
   });
   const prepared={session,records:[{externalRecordId:source.id,disposition:'INTERPRETED' as const,transactionId:null,interpretation,attention:[]}]};
   const resolved=await service.resolve({prepared,records:[source],ledger:clean,now:input.now}),row=resolved.records[0];
   if(row.ledgerState!=='READY_FOR_LEDGER'||row.attention.some(a=>a.blocking))throw Error('SOURCE_FACTS_REQUIRE_ANSWER');
-  let replacement=buildImportedLedgerIntent({resolved:row,source});
+  let replacement=buildImportedLedgerIntent({resolved:row,source,captureEvidence:workspace.captureEvidence?.[source.sessionId]});
   if(target){
    const oldPostings=target.fields.status==='PENDING'&&target.fields.posting_plan?pendingPostings(target):working.entities;
    const oldMovements=oldPostings.filter(e=>e.type==='balance_movements'&&e.fields.transaction_id===target.id&&e.fields.amount!==0);
@@ -81,7 +81,7 @@ export async function planImportSourceAnswer(input:SourceAnswerRequest,workspace
   const decisionId=sourceDecisionId(evidence);
   if(working.conflicts.some(c=>c.entity_type==='import_rules'&&c.entity_id===decisionId))throw Error('UNRESOLVED_CONFLICT');
   if(working.entities.some(e=>e.type==='import_rules'&&e.id===decisionId))throw Error('SOURCE_ALREADY_DECIDED');
-  advance({kind:'ATTACH_SOURCE_EVIDENCE',transactionId,source:importedSourceEvidence(evidence)});
+  advance({kind:'ATTACH_SOURCE_EVIDENCE',transactionId,source:importedSourceEvidence(evidence,workspace.captureEvidence?.[evidence.sessionId])});
   commands.push({action:'CREATE_ENTITY',entity:{type:'import_rules',id:decisionId,fields:{rule_key:decisionId,value:JSON.stringify({version:1,kind:'SOURCE_DECISION',sourceId:importedSourceRecordId(evidence),transactionId,choice:evidence.id===source.id?input.mode:'REJECT_ALTERNATIVE',decidedAt:input.now})}}});
   accepted.add(importedSourceRecordId(evidence));
  }

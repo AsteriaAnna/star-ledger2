@@ -10,6 +10,8 @@
 
 ## 当前重要证据
 
+- [AI截图基础计划](2026-10-05-ai-capture-development-plan.md)：阶段与验收；[多事件来源](2026-10-06-capture-multi-event-foundation.md)、[正式证据保存与恢复](2026-10-06-capture-ledger-evidence-persistence.md)为限定本地实施记录。
+
 - [真实文件导入修复](2026-10-05-import-fixes-progress.md)：169+169样本结果与未完成资金端。
 - [改账](m5-2-editing-progress.md)、[退款](m5-3-refund-progress.md)、[来源恢复](m5-1-source-review-progress.md)：限定验收，不等于完整任务通过。
 - [服务端受邀注册](2026-10-05-account-onboarding-progress.md)：以末节真实PG/注册/登录验收为准。

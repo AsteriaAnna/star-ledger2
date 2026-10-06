@@ -1,3 +1,4 @@
+import {readPersistedCaptureEvidence} from '../../../packages/importing/persisted-capture-evidence.ts';
 import {validateCaptureReferences,mergeCaptureEvidence} from '../../../packages/importing/capture-evidence.ts';
 import {ledgerSettings,planLedgerSettings,planLegacyLedgerSettings} from '../../../packages/application/ledger-settings.ts';
 import type {Operation,Entity,EntityType,Batch,Conflict,FieldVersion} from '../../../packages/domain/index.ts';
@@ -44,11 +45,11 @@ export type State={cloud?:{uid:string;ledger:string;recoveryKey:string};version:
 export const fresh=():State=>({version:2,imports:[],importRevision:0,importWorkspace:{sessions:{},records:{},attention:{},outcomes:{}},revision:0,device:crypto.randomUUID(),ops:[],pending:[],batches:[],envelopes:{},settings:{budget:300000,categories:['餐饮','购物','交通','生活','娱乐','学习','医疗','其他'],mode:'auto'}});
 export class MemoryStore implements SyncStore {
  state:State;entities:Entity[];conflicts:Conflict[];
- constructor(state:State){this.state=structuredClone(state);const p=project(state.ops);this.entities=p.entities;this.conflicts=p.conflicts;this.state.settings=ledgerSettings(p,this.state.settings);}
+ constructor(state:State){this.state=structuredClone(state);const p=project(state.ops);readPersistedCaptureEvidence(p.entities);this.entities=p.entities;this.conflicts=p.conflicts;this.state.settings=ledgerSettings(p,this.state.settings);}
  atomic<T>(fn:()=>T):T{const s=structuredClone(this.state),e=this.entities,c=this.conflicts;try{return fn();}catch(err){this.state=s;this.entities=e;this.conflicts=c;throw err;}}
  allOperations(){return structuredClone(this.state.ops);}
  append(op:Operation,local:boolean){this.state.ops.push(structuredClone(op));if(local)this.state.pending.push(op.id);}
- project(entities:Entity[],conflicts:Conflict[],_v:FieldVersion[]){this.entities=entities;this.conflicts=conflicts;this.state.settings=ledgerSettings({entities,conflicts},this.state.settings);}
+ project(entities:Entity[],conflicts:Conflict[],_v:FieldVersion[]){readPersistedCaptureEvidence(entities);this.entities=entities;this.conflicts=conflicts;this.state.settings=ledgerSettings({entities,conflicts},this.state.settings);}
  get(type:EntityType,id:string){return this.entities.find(e=>e.type===type&&e.id===id);}
  pendingOperations(){const ids=new Set(this.state.pending);return this.state.ops.filter(o=>ids.has(o.id));}
  acknowledgeOperations(ids:string[]){const set=new Set(ids);this.state.pending=this.state.pending.filter(id=>!set.has(id));}

@@ -33,6 +33,7 @@ export type ResolvedImportRecord=PreparedImportRecord&{
 };
 
 export type ResolveImportResult={
+ captureEvidence?:CaptureEvidence[];
  session:ImportSession;
  records:ResolvedImportRecord[];
 };
@@ -89,6 +90,7 @@ export class ImportStatementService {
  }
 
  async resolve(input:ResolveImportInput):Promise<ResolveImportResult>{
+  const captureEvidence=await this.workspace.listCaptureEvidence(input.prepared.session.id);
   const byRecord=new Map(input.records.map(record=>[record.id,record]));
   const allAttention:AttentionItem[]=[];
   const resolved:ResolvedImportRecord[]=[];
@@ -175,14 +177,14 @@ export class ImportStatementService {
    const value:ResolvedImportRecord={...prepared,ledgerState:items.some(item=>item.blocking)?'NEEDS_ATTENTION':'READY_FOR_LEDGER',account,targetAccount,relation,attention:items};
    resolved.push(value);
    if(value.disposition==='INTERPRETED'&&value.ledgerState==='READY_FOR_LEDGER'){
-    const intent=buildImportedLedgerIntent({resolved:value,source});
+    const intent=buildImportedLedgerIntent({resolved:value,source,captureEvidence});
     working=applyCommands(working,interpret(intent,working));
    }
   }
 
   const session=summarizeSession({...input.prepared.session,updatedAt:input.now},allAttention,input.now);
   await this.workspace.saveSessionSnapshot(session,input.records,allAttention,input.prepared.records.map(r=>r.interpretation));
-  return {session,records:resolved};
+  return {session,records:resolved,...(captureEvidence.length?{captureEvidence}:{})};
  }
  async prepare(input:PrepareImportInput):Promise<PrepareImportResult>{
   const byRecord=new Map(input.interpretations.map(value=>[value.externalRecordId,value]));

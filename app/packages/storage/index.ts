@@ -1,3 +1,4 @@
+import {readPersistedCaptureEvidence} from '../importing/persisted-capture-evidence.ts';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 import {fields} from '../domain/index.ts';
@@ -23,6 +24,7 @@ export class SqliteStore implements SyncStore {
   if(Number(version)<7)this.atomic(()=>this.db.exec(readFileSync(new URL('./migrations/007.sql',import.meta.url),'utf8')));
   if(Number(version)<8)this.atomic(()=>this.db.exec(readFileSync(new URL('./migrations/008.sql',import.meta.url),'utf8')));
   if(Number(version)<9)this.atomic(()=>this.db.exec(readFileSync(new URL('./migrations/009.sql',import.meta.url),'utf8')));
+  readPersistedCaptureEvidence(this.db.prepare('SELECT * FROM source_records').all().map(row=>({type:'source_records' as const,id:String(row.id),fields:row as Entity['fields']})));
   this.db.prepare('INSERT OR IGNORE INTO sync_devices VALUES(?)').run(device);
   }catch(error){this.db.close();throw error;}
  }
@@ -37,6 +39,7 @@ export class SqliteStore implements SyncStore {
   if(local)this.db.prepare('INSERT INTO sync_outbox VALUES(?)').run(op.id);
  }
  project(entities:Entity[],conflicts:Conflict[],versions:FieldVersion[]):void {
+  readPersistedCaptureEvidence(entities);
   // Prototype projection rebuild: never remove source evidence or physically delete facts.
   const order:EntityType[]=['transactions','accounts','source_records','balance_movements','consumption_effects','transaction_links','balance_anchors','import_rules','ledger_settings'];
   for(const type of order)for(const e of entities.filter(e=>e.type===type)) {

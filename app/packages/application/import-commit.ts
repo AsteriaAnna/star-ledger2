@@ -23,7 +23,7 @@ export function planImportCommit(result:ResolveImportResult,records:ExternalReco
   if(record.attention.length)plan.attentionRecordIds.push(record.externalRecordId);
   if(record.disposition==='SKIP_DUPLICATE'){plan.skippedDuplicateIds.push(record.externalRecordId);continue;}
   if(record.disposition==='SOURCE_UPDATE'){
-   if(record.transactionId)plan.evidenceUpdates.push({externalRecordId:record.externalRecordId,transactionId:record.transactionId,source:importedSourceEvidence(source)});
+   if(record.transactionId)plan.evidenceUpdates.push({externalRecordId:record.externalRecordId,transactionId:record.transactionId,source:importedSourceEvidence(source,result.captureEvidence)});
    plan.blockedRecordIds.push(record.externalRecordId);continue;
   }
   if(record.disposition==='NO_EFFECT'){plan.noEffectRecordIds.push(record.externalRecordId);continue;}
@@ -34,7 +34,7 @@ export function planImportCommit(result:ResolveImportResult,records:ExternalReco
    continue;
   }
   if(record.disposition==='INTERPRETED'&&record.ledgerState==='READY_FOR_LEDGER'){
-   plan.newRecords.push({externalRecordId:record.externalRecordId,intent:buildImportedLedgerIntent({resolved:record,source})});continue;
+   plan.newRecords.push({externalRecordId:record.externalRecordId,intent:buildImportedLedgerIntent({resolved:record,source,captureEvidence:result.captureEvidence})});continue;
   }
   // NOT_APPLICABLE is valid only for already-classified duplicate/no-effect records.
   if(record.ledgerState!=='NOT_APPLICABLE')throw Error('UNPLANNED_IMPORT_STATE');

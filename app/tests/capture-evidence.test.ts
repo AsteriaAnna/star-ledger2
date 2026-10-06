@@ -88,5 +88,5 @@ test('existing preparation persists container without collapsing event records o
  const interpretations:EventInterpretation[]=records.map((r,i)=>({externalRecordId:r.id,eventKind:i===0?'PURCHASE':'REFUND',status:'SUCCESS',amountFen:r.facts.amountFen,occurredAt:at,displayName:'测试',channelRaw:'零钱',categorySuggestion:null,evidence:[]}));
  const ledger={entities:[],conflicts:[]};const prepared=await service.prepare({sessionId:'s',sourceType:'SCREENSHOT',sourceSystem:'WECHAT',records,interpretations,captureEvidence:[e],ledger,now:at});
  assert.equal(prepared.records.length,3);assert.deepEqual(ledger.entities,[]);assert.equal((await workspace.listCaptureEvidence('s')).length,1);
- const payload=JSON.parse(importSourcePayload(records[1]));assert.equal(payload.capture.evidenceId,e.id);assert.equal(payload.originalOrder,'PAY-14');assert.equal(payload.order,null);
+ const payload=JSON.parse(importSourcePayload(records[1],[e]));assert.equal(payload.capture.evidenceId,e.id);assert.equal(payload.originalOrder,'PAY-14');assert.equal(payload.order,null);
 });

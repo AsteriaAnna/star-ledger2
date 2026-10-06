@@ -1,12 +1,14 @@
 import {sha256} from '@noble/hashes/sha256';
 import {bytesToHex} from '@noble/hashes/utils';
 import type {LedgerIntent,SourceEvidence} from '../domain/accounting.ts';
-import type {ExternalRecord} from '../importing/types.ts';
+import {validateCaptureReferences} from '../importing/capture-evidence.ts';
+import type {CaptureEvidence,ExternalRecord} from '../importing/types.ts';
 import type {ResolvedImportRecord} from './import-service.ts';
 
 export type LedgerIntentBuildInput={
  resolved:ResolvedImportRecord;
  source:ExternalRecord;
+ captureEvidence?:CaptureEvidence[];
 };
 
 export const sourceIdentityNamespace=(source:ExternalRecord)=>[source.sourceSystem,source.platformRaw,source.profile,source.sourceIdentity].map(value=>encodeURIComponent(value)).join(':');
@@ -15,7 +17,9 @@ export const importedSourceRecordId=(source:ExternalRecord)=>'source-v2:'+bytesT
 
 export const sourceDecisionId=(source:ExternalRecord)=>'v2-source-decision:'+importedSourceRecordId(source).slice('source-v2:'.length);
 
-export function importSourcePayload(source:ExternalRecord){
+export function importSourcePayload(source:ExternalRecord,evidence:CaptureEvidence[]=[]){
+ const container=source.capture?evidence.find(e=>e.id===source.capture!.evidenceId):undefined;
+ if(source.capture)validateCaptureReferences([source],container?[container]:[]);
  return JSON.stringify({
   version:3,
   identity:source.sourceIdentity,
@@ -29,11 +33,11 @@ export function importSourcePayload(source:ExternalRecord){
   original:source.rawPayload,
   parserVersion:source.parserVersion,
   precision:source.facts.precision,
-  ...(source.capture?{capture:source.capture}:{})
+  ...(source.capture?{capture:source.capture,captureEvidenceVersion:1,captureEvidence:container}:{})
  });
 }
 
-export function importedSourceEvidence(source:ExternalRecord):SourceEvidence{return {id:importedSourceRecordId(source),sourceType:source.sourceType,platform:source.platformRaw,rawPayload:importSourcePayload(source),capturedAt:source.capturedAt};}
+export function importedSourceEvidence(source:ExternalRecord,evidence:CaptureEvidence[]=[]):SourceEvidence{return {id:importedSourceRecordId(source),sourceType:source.sourceType,platform:source.platformRaw,rawPayload:importSourcePayload(source,evidence),capturedAt:source.capturedAt};}
 
 export function buildImportedLedgerIntent(input:LedgerIntentBuildInput):LedgerIntent{
  const {resolved,source}=input,interpretation=resolved.interpretation;
@@ -44,7 +48,7 @@ export function buildImportedLedgerIntent(input:LedgerIntentBuildInput):LedgerIn
  if(interpretation.eventKind==='UNKNOWN')throw Error('IMPORT_EVENT_NOT_POSTABLE');
 
  const id=importedTransactionId(source);
- const sourceEvidence=importedSourceEvidence(source);
+ const sourceEvidence=importedSourceEvidence(source,input.captureEvidence);
  const base={id,occurredAt:interpretation.occurredAt,name:interpretation.displayName.trim()||source.facts.counterpartyRaw||source.facts.productRaw||source.facts.transactionTypeRaw||'账单记录',amount:interpretation.amountFen,status:interpretation.status,note:source.facts.noteRaw||source.facts.productRaw||'',source:sourceEvidence};
  const account=resolved.account?.state==='RESOLVED'?resolved.account.accountId:null;
  const sourceSponsored=/亲情卡|亲属卡/.test(source.facts.channelRaw);
