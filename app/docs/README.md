@@ -10,6 +10,8 @@
 
 ## 当前重要证据
 
+- [K05a最终PG整改复测](2026-10-06-capture-pg-retest-accepted.md)：真实功能9/9、有效权限48/48；PG子项通过，截图阶段仍部分通过。
+
 - [K05a真实PG部分验收与整改](2026-10-06-capture-pg-real-acceptance-and-fixes.md)：真实API返回值和默认ACL修复，当前等待定向复测。
 
 - [CloudBase识别任务/结果基础](2026-10-06-capture-postgres-foundation.md)：源码与真实PG验收指令；当前会话云连接缺失。

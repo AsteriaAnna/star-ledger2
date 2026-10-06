@@ -2,6 +2,8 @@
 
 记录：2026-10-06 19:19（北京时间）用户转交已连接CloudBase MCP的Codex报告。R03/C02/C05/C06/M5.1-O/F。以下云端事实来源为该报告，本会话未独立复查；修复代码的本地验证另列。
 
+> 后续状态：20:43用户转交[最终整改复测](2026-10-06-capture-pg-retest-accepted.md)，PG子项已通过；本页保留首轮失败与修复时点，不再作为重复复测授权。
+
 ## 用户报告的真实验收
 
 环境xingzhang-dev-d0g4a950c6f1204d1 / ap-shanghai，baas_trial，postgres-45ay1vm6，PostgreSQL 17.11。代码a46f130，使用Manager executePGSql和调用期间STS，运行仓库原有CapturePostgresRepository与RemoteCaptureService。
