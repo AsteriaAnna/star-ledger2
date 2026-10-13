@@ -1,3 +1,5 @@
+> **2026-10-13 入口：**[产品方向](product/direction.md) → [AI 工作方式](engineering/ai-workflow.md) → [当前状态](project-status.md) → [唯一计划](m1-m7-execution-plan.md)。本页其余索引保留 2026-10-05 整理时的证据分类；旧暂停点不再是当前指令。
+
 # 文档目录与优先级
 
 接手顺序：[当前状态](project-status.md) → [唯一执行计划](m1-m7-execution-plan.md) → [旧需求对照](plan-reconciliation.md) → [职责契约](responsibility-contract.md)。[仓库与云清单](repository-and-cloud-state.md)保存分支、部署与需复查项。
