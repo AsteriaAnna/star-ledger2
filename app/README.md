@@ -1,6 +1,6 @@
 # 星账开发入口
 
-先看 [产品方向](docs/product/direction.md)、[实际状态](docs/project-status.md)、[唯一计划](docs/m1-m7-execution-plan.md) 和 [AI 工作方式](docs/engineering/ai-workflow.md)。历史报告按任务检索；2026-10-05 的暂停开发说明仅是当日状态。
+本页只提供目录与命令。接手任务按根目录 [AGENTS.md](../AGENTS.md) 的条件查阅产品、状态或计划；历史报告按需检索，2026-10-05 的暂停说明仅是当日状态。
 
 网页是当前主要客户端。本地账本存于 IndexedDB；Node/SQLite 用于核心存储验证，Tauri 原生目录是探针。手机截图与电脑文件导入应进入共同账务语义，但多图、真实截图、退款与跨来源去重尚待实测和完善。CloudBase 是目标网站、认证及数据服务；当前真实 PostgreSQL 注册测试不能证明网页注册、同步或新设备恢复已可用。
 
