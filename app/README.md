@@ -1,6 +1,6 @@
 # 星账开发入口
 
-本页只提供目录与命令。接手任务按根目录 [AGENTS.md](../AGENTS.md) 的条件查阅产品、状态或计划；历史报告按需检索，2026-10-05 的暂停说明仅是当日状态。
+本页只提供目录与命令。工作规则见根目录 [AGENTS.md](../AGENTS.md)，任务状态按需查 [当前工作](docs/current.md)。
 
 网页是当前主要客户端。本地账本存于 IndexedDB；Node/SQLite 用于核心存储验证，Tauri 原生目录是探针。手机截图与电脑文件导入应进入共同账务语义，但多图、真实截图、退款与跨来源去重尚待实测和完善。CloudBase 是目标网站、认证及数据服务；当前真实 PostgreSQL 注册测试不能证明网页注册、同步或新设备恢复已可用。
 
@@ -35,4 +35,4 @@ npm run test:web:imports
 | apps/native-probe、apps/windows、apps/android | 探针和未来平台入口 |
 | docs | 当前入口及带日期的历史证据 |
 
-PR #17 和 #18 仍是草稿，完整差异与验收结论见 [AI 工作方式](docs/engineering/ai-workflow.md)。旧 GitHub Pages 工作流不是当前 CloudBase 发布入口；不要因文档整理直接删除工作流或历史代码。
+旧分支及其历史说明不能代表 main。CloudBase 部署需核对实际环境；现存 GitHub Pages 工作流不是 CloudBase 发布入口。
