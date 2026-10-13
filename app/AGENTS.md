@@ -1,15 +1,11 @@
-# app/ 持续工作入口
+# app/ 工作入口
 
-继承根目录AGENTS.md。产品源码只维护本目录，legacy-duo只读参考。
+继承 [仓库规则](../AGENTS.md)。本目录是个人版当前源码，legacy-duo/ 只作历史参考。
 
-本轮只整理文档，暂不修改功能、不部署；后续先与用户讨论具体目标并取得对应测试案例。开始时依次读：
-1. `docs/project-status.md`
-2. `docs/m1-m7-execution-plan.md`
-3. `docs/plan-reconciliation.md`
-4. `docs/responsibility-contract.md`
+任务开始时核对分支及工作区；按任务读取 [产品方向](docs/product/direction.md)、[状态](docs/project-status.md)、[唯一计划](docs/m1-m7-execution-plan.md) 和 [AI 工作方式](docs/engineering/ai-workflow.md)。旧日期报告提供证据，不是待办或禁止开发的持续指令。
 
-当前计划只有一份，其余日期报告/旧版本说明是证据或历史，不是平行待办。每个实现提交引用R/C/M节点，更新实际验证与未完成门槛；不能把服务已有、CI通过、云端实测、浏览器与真机完成混称完成。
+代码职责：packages/domain、accounting 保存账务规则与不变量；packages/application、importing 负责流程、来源和去重；packages/analytics 使用统一资金及消费口径；packages/storage、sync、platform 处理保存、加密、同步和平台边界；apps/web 处理页面与输入适配；cloudbase/ 处理云函数和配置。不要在 main.ts 重新实现账务规则。
 
-先单人账务与文件/截图导入，再网页注册和共同登录/同步恢复，随后双人，再Windows/Android安装版。Android系统截图分享必须真机验收；iOS暂缓。扩大测试/短信按身份与恢复成熟度推进，双人具体权限和账务设定待讨论。
+每个可验收任务说明入口、修改范围、相关测试及真实环境结果。账务改变须验证 Transaction、BalanceMovement、ConsumptionEffect 及刷新后的余额/统计。按需运行 npm test、npm run typecheck、npm run typecheck:web、npm run check:platform、npm run build:web 和对应浏览器脚本；确认脚本检查的是当前入口，模拟云端不当作真实同步。
 
-业务规则不写回main.ts。WIP恢复与PR #17不因整理自动合入main。每轮先检查分支与未提交修改，不覆盖别的执行环境的工作。
+PR #17 受邀注册与 PR #18 截图能力仍为草稿，不能仅凭 CI 或标题整包合并。不要修改/部署其他任务的 WIP 或提交私人数据。完成后更新事实状态；不以文档提交冒充产品代码或云端升级。
