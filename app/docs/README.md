@@ -1,4 +1,4 @@
-> **2026-10-13 入口：**[产品方向](product/direction.md) → [AI 工作方式](engineering/ai-workflow.md) → [当前状态](project-status.md) → [唯一计划](m1-m7-execution-plan.md)。本页其余索引保留 2026-10-05 整理时的证据分类；旧暂停点不再是当前指令。
+> **阅读方式：**按任务查 [产品方向](product/direction.md)、[当前状态](project-status.md)、[唯一计划](m1-m7-execution-plan.md) 或 [AI 工作方式](engineering/ai-workflow.md)，无需依次通读。本页其余索引保留 2026-10-05 的证据分类；旧暂停点不是当前指令。
 
 # 文档目录与优先级
 
