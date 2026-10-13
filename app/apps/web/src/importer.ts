@@ -62,17 +62,22 @@ export function issues(d:Draft):string[]{return [...new Set(d.blockers||[])].fil
 export function parseScreenshot(text:string,fingerprint:string):Draft{
  const originalText=text;
  // Repair spacing only inside known labels, never between arbitrary Chinese words.
- for(const label of ['付款金额','商户全称','交易对方','商品说明','商品名称','收款方','支付方式','付款方式','交易单号','订单号','交易时间','付款时间'])text=text.replace(new RegExp(label.split('').join('[ \\t]*'),'g'),label);
+ for(const label of ['付款金额','退款金额','实际退款','退款到账金额','退款单号','原交易单号','商户全称','交易对方','商品说明','商品名称','收款方','支付方式','付款方式','交易单号','订单号','交易时间','付款时间'])text=text.replace(new RegExp(label.split('').join('[ \\t]*'),'g'),label);
  const lines=text.split('\n').map(x=>x.trim()).filter(Boolean);
  const labelValue=(labels:string[])=>{for(let i=0;i<lines.length;i++){const m=lines[i].match(new RegExp('^(?:'+labels.join('|')+')(?:(?:[：:/]|\\s)+|$)(.*)$'));if(m)return m[1].trim()||lines[i+1]||'';}return '';};
  const normalized=text.replace(/\s+/g,' ');
- const amount=normalized.match(/[¥￥]\s*([+-]?\d[\d,]*(?:\.\d{1,2})?)(?![\d.])/)?.[1]||labelValue(['付款金额','实付','金额'])||lines.find(l=>/^[+-]?\d+\.\d{2}$/.test(l))||'';
  const rawDate=normalized.match(/\d{4}[-年/.]\d{1,2}[-月/.]\d{1,2}日?\s+\d{1,2}:\d{2}(?::\d{2})?/)?.[0]||'';
  const date=wallDate(rawDate),platform=/微信/.test(text)?'微信':/支付宝/.test(text)?'支付宝':'截图';
  const order=labelValue(['交易单号','订单号','交易号']).match(/^[\dA-Za-z]{10,}/)?.[0]||'';
+ const refundId=labelValue(['退款单号','退款订单号']).match(/^[\dA-Za-z]{10,}/)?.[0]||'';
  const kind=/退款成功|退款金额/.test(text)?'REFUND':/花呗.*还款|主动还款|自动还款/.test(text)?'REPAYMENT':/转账/.test(text)?'EXTERNAL_TRANSFER':/收入|收款成功/.test(text)?'INCOME':'PURCHASE';
  const name=labelValue(['商户全称','交易对方','收款方'])||labelValue(['商品说明','商品名称','商品'])||'';
- const channel=labelValue(['付款方式','支付方式']);let normalizedAmount=amount;const blockers=['SCREENSHOT'];try{normalizedAmount=(money(amount)/100).toFixed(2);}catch{blockers.push('AMOUNT');}if(!date.utc)blockers.push('DATE');
+ // A refund page may show the original payment and the refunded amount. Missing refund amount remains unknown.
+ const amount=kind==='REFUND'?labelValue(['退款金额','实际退款','退款到账金额']):labelValue(['付款金额','实付','实际支付','金额'])||normalized.match(/[¥￥]\s*([+-]?\d[\d,]*(?:\.\d{1,2})?)(?![\d.])/)?.[1]||lines.find(l=>/^[+-]?\d+\.\d{2}$/.test(l))||'';
+ const channel=labelValue(['付款方式','支付方式']);let normalizedAmount=amount;const blockers=['SCREENSHOT'];
+ try{normalizedAmount=(money(amount)/100).toFixed(2);}catch{blockers.push('AMOUNT');}if(!date.utc)blockers.push('DATE');
  if(needsSplit(channel))blockers.push('COMPOUND');
- return {key:order?hash({v:2,platform,profile:'本人',sourceClass:'payment',eventId:order}):fingerprint,itemId:fingerprint,profile:'本人',platform,name,amount:normalizedAmount,date:date.wall,precision:date.precision,kind,status:/失败|关闭/.test(text)?'FAILED':/待支付|处理中/.test(text)?'PENDING':/成功/.test(text)?'SUCCESS':'UNKNOWN',channel,account:'',to:'',category:'其他',original:'',note:'',raw:JSON.stringify({ocrText:originalText,fingerprint,order}),issue:'请核对截图后保存',selected:false,sourceType:'SCREENSHOT',order,sponsor:/亲情卡|亲属卡/.test(channel),consumption:'0',blockers,confirmed:[],workflow:'review',parserVersion:3};
+ const sourceClass=kind==='REFUND'?'refund':'payment',eventId=kind==='REFUND'?refundId:order;
+ const identity=eventId?hash({v:2,platform,profile:'本人',sourceClass,eventId}):fingerprint;
+ return {key:identity,identity,sourceClass,itemId:fingerprint,profile:'本人',platform,name,amount:normalizedAmount,date:date.wall,precision:date.precision,kind,status:/失败|关闭/.test(text)?'FAILED':/待支付|处理中/.test(text)?'PENDING':/成功/.test(text)?'SUCCESS':'UNKNOWN',channel,account:'',to:'',category:'其他',original:'',note:'',raw:JSON.stringify({ocrText:originalText,fingerprint,order,'退款单号':refundId,'原交易单号':kind==='REFUND'?order:''}),issue:'请核对截图后保存',selected:false,sourceType:'SCREENSHOT',order:kind==='REFUND'?refundId:order,originalOrder:kind==='REFUND'?order:'',sponsor:/亲情卡|亲属卡/.test(channel),consumption:'0',blockers,confirmed:[],workflow:'review',parserVersion:3};
 }
