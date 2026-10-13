@@ -1,7 +1,5 @@
-# windows 平台状态
+# windows 平台
 
-当前未交付完整安装版。apps/native-probe仅验证Tauri/SQLite事务和重开，不是本平台成品。
+当前目录未交付完整安装版；apps/native-probe 是 Tauri/SQLite 探针。平台实现应复用共同账务核心，具体交付顺序由当前用户任务和能力验证决定。系统分享、存储、凭据及安装升级需要真实设备验收。
 
-共同账务/导入/认证/同步先完成，再适配平台存储、文件、凭据和安装升级。双人版先于正式Android发布，Windows安装版也在计划；Android系统截图分享必须真机验收，iOS暂缓。
-
-以 [唯一计划](../../docs/m1-m7-execution-plan.md) 和 [当前状态](../../docs/project-status.md) 为准。当前暂停功能开发，不沿用历史“G3再实现”作为授权。
+旧阶段排序和暂停指令已撤回。按需查 [当前工作](../../docs/current.md)。
