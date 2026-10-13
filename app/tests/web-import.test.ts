@@ -18,3 +18,20 @@ test('无单号来源用内容指纹稳定识别，跨文件不漂移',()=>{
  assert.notEqual(single.identity,twin.identity); // 同文件完全相同的第二笔用出现序数区分
  assert.notEqual(single.identity,parseRows([headers,noOrder('66.00')])[0].identity); // 金额不同即不同交易
 });
+
+test('screenshot refund takes its own amount and identity, not the original payment',()=>{
+ const payment=parseScreenshot('微信支付\n付款金额 ¥50.00\n交易单号 1234567890123456\n支付成功','payment-image');
+ const refund=parseScreenshot('微信支付\n付款金额 ¥50.00\n退款成功\n退款金额 ¥10.00\n交易单号 1234567890123456\n退款单号 9876543210987654','refund-image');
+ assert.equal(refund.kind,'REFUND');assert.equal(refund.amount,'10.00');
+ assert.equal(refund.originalOrder,'1234567890123456');
+ assert.equal(refund.order,'9876543210987654');
+ assert.equal(refund.sourceClass,'refund');assert.notEqual(refund.identity,payment.identity);
+ const second=parseScreenshot('微信支付\n退款成功\n退款金额 ¥5.00\n交易单号 1234567890123456\n退款单号 9876543210987655','second-refund-image');
+ assert.notEqual(refund.identity,second.identity);
+});
+test('screenshot refund without its own amount remains unresolved',()=>{
+ const refund=parseScreenshot('微信支付\n付款金额 ¥50.00\n退款成功\n交易单号 1234567890123456','refund-without-amount');
+ assert.equal(refund.kind,'REFUND');assert.ok(refund.blockers?.includes('AMOUNT'));
+ assert.notEqual(refund.amount,'50.00');assert.equal(refund.order,'');
+ assert.equal(refund.originalOrder,'1234567890123456');
+});
